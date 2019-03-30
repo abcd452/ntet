@@ -15,5 +15,6 @@ app.use(cors());
 app.use(require('./signin'));
 app.use(require('./login'));
 app.use(require('./usuario'));
+app.use(require('./taxista'));
 
 module.exports = app;

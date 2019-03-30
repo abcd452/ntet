@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const Joi = require('joi');
 const connectionData = require('../config/config').connectionData;
 const pool = new Pool(connectionData);
+let carrerasPorTomar = new Array();
+let usuariosAceptados = new Array();
 
 // ALL QUERIES, HERE: 
 
@@ -42,6 +44,46 @@ const createUser = (request, response) => {
                 });
             })
     }
+};
+
+const createDirFav = (request, response) => {
+    const body = request.body;
+    const schema = {
+        cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        nombre: Joi.string().min(3).max(250).required().regex(/^[a-zA-Z0-9]+$/),
+        coords: Joi.string().min(5).max(80).required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('INSERT INTO dir_fav (num_cel_u, nombre_dir, coords_gps_u) VALUES ($1, $2, $3)',
+        [body.cel, body.nombre, body.coords], (error, results) => {
+            if (error) {
+                console.log(body.cel);
+                console.log(body.nombre);
+                console.log(body.coords);
+                console.log(error);
+                return response.status(400).json({
+                    ok: false,
+                    err: error
+                });
+            }
+
+            response.status(201).json({
+                ok: true,
+                message: `Direccion guardada con exito`,
+                usuario: {
+                    nombre: body.nombre,
+                    coords: body.coords,
+                    usuario: body.cel
+                }
+            });
+        })
+
 };
 
 const createTaxista = (request, response) => {
@@ -175,14 +217,188 @@ const getUserById = (request, response) => {
     });
 };
 
+const pedirCarrera = (request, response) => {
+
+    const body = request.body;
+    const schema = {
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        coordsI: Joi.string().required(),
+        coordsF: Joi.string().required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT * FROM closest($1)', [body.coordsI], (error, results) => {
+        if (error) {
+            return response.status(404).json({
+                ok: false,
+                err: error
+            });
+        }
+
+        response.status(201).json({
+            ok: true,
+            message: `Busqueda con exito, esperando confirmacion del taxista`,
+            busqueda: {
+                celular: body.num,
+            }
+        });
+        for (let i = 0; i < results.rows.length; i++) {
+            let meter = [body.num, results.rows[i].id_taxista, results.rows[i].placa, body.coordsI, body.coordsF];
+            carrerasPorTomar.push(meter);
+            console.log(carrerasPorTomar[i]);
+        }
+    });
+};
+
+const comenzarCarrera = (request, response) => {
+    const body = request.body;
+
+    console.log('comenzando carrera...');
+    let usuario_busqueda; //usuario al que el taxista le acepto la carrera
+    let placaTaxista, coordsI, coordsF;
+
+    function existe (x){
+        for (let i = 0; i < carrerasPorTomar.length; i++){
+            if (x === carrerasPorTomar[i][1]){
+                usuario_busqueda = carrerasPorTomar[i][0];
+                placaTaxista = carrerasPorTomar[i][2];
+                coordsI = carrerasPorTomar[i][3];
+                coordsF = carrerasPorTomar[i][4];
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function borrar(x) {
+        for (let i = 0; i < carrerasPorTomar.length; i++) {
+            if (x === carrerasPorTomar[i][0]) { //borra todos los taxistas que no alcanzaron a aceptar del usuario carrerasPorTomar
+                i -= 1;
+                carrerasPorTomar.splice(i, 1);
+            } else if (x === body.id_taxista) { //borra todas las apariciones del taxista que acepto la carrera de carrerasPorTomar
+                i -= 1;
+                carrerasPorTomar.splice(i, 1);
+            }
+        }
+    }
+
+    if (existe(body.id_taxista)){
+        response.status(201).json({
+            ok: true,
+            message: `Carrera encontrada!`,
+            busqueda: {
+                usuario: usuario_busqueda,
+                taxista: body.id_taxista
+            }
+        });
+        borrar(usuario_busqueda);
+        usuariosAceptados.push([usuario_busqueda, body.id_taxista, placaTaxista, coordsI, coordsF]);
+        console.log(carrerasPorTomar);
+    } else {
+        response.status(204).json({
+            ok: true,
+            message: 'Su servicio no ha sido solicitado'
+        });
+    }
+};
+
+const confirmarCarrera = (request, response) => {
+
+    const body = request.body;
+    const schema = {
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    let taxista, placa, coordsI, coordsF;
+    //console.log(usuariosAceptados[0][0], usuariosAceptados[0][1], usuariosAceptados[0][2], usuariosAceptados[0][3], usuariosAceptados[0][4]);
+
+    function existe(x) {
+        for (let i = 0; i < usuariosAceptados.length; i++) {
+            if (x === usuariosAceptados[i][0]) {
+                taxista = usuariosAceptados[i][1];
+                placa = usuariosAceptados[i][2];
+                coordsI = usuariosAceptados[i][3];
+                coordsF = usuariosAceptados[i][4];
+
+                usuariosAceptados.splice(i, 1);
+                return true;
+            }
+        }
+        return false;
+    }
+    //console.log(taxista, placa, coordsI, coordsF);
+
+    //comenzar_carrera('3167434500', '1234', 'AAA111', '(3.380049,-76.536052)', '(3.382234,-76.537919)');
+
+    if (existe(body.num)) {
+        pool.query('SELECT comenzar_carrera($1, $2, $3, $4, $5)',
+            [body.num, taxista, placa, coordsI, coordsF], (error, results) => {
+                if (error) {
+                    return response.status(400).json({
+                        ok: false,
+                        err: error
+                    });
+                }
+
+                //select * from usuario_a_taxista('1234', 'AAA111');
+                pool.query('SELECT * FROM usuario_a_taxista($1, $2)',
+                    [taxista, placa], (error, results) => {
+                        if (error) {
+                            return response.status(404).json({
+                                ok: false,
+                                err: error
+                            });
+                        }
+
+                        let vistaDeTaxista = {
+                            nombreCompleto: results.rows[0].nombre_completo,
+                            numeroCelTaxista: results.rows[0].numero_de_celular,
+                            placa: results.rows[0].placa,
+                            marcaModelo: results.rows[0].marca_y_modelo,
+                            numeroDeViajes: results.rows[0].numero_de_viajes,
+                            puntaje: results.rows[0].puntaje
+                        };
+                        response.status(200).json({
+                            ok: true,
+                            vistaDeTaxista,
+                            message: 'La Carrera ha comenzado',
+                        });
+                    });
+
+            });
+    } else {
+        response.status(204).json({
+            ok: true,
+            message: 'Su solicitud no ha sido aceptada'
+        });
+    }
+};
+
+
+
 
 module.exports = {
-    createUser,
-    createTaxista,
+    createUser, //Crea el usuario
+    createTaxista, //Crea el taxista
     getUserById,
     deleteUser,
     updateUser,
-    loginUser,
-    getDirections
+    loginUser, //Logea al usuario a la aplicacion
+    getDirections,
+    pedirCarrera, //Permite al usuario pedir un taxi
+    createDirFav,
+    comenzarCarrera, //Permite al taxista saber si ha sido solicitado, en caso de serlo puede aceptar la carrera
+    confirmarCarrera
 };
 
