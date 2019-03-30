@@ -6,7 +6,7 @@ const {verificaToken, verificaUserRole} = require('../midlewares/midlewares');
 
 
 app.get('/profile/:id',verificaToken,db.getUserById);
-app.get('/usuarios',db.getAllUsers);
+app.get('/profile/dirfav/:id',verificaToken,db.getDirections);
 
 
 module.exports = app;
