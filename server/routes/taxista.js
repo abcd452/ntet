@@ -6,5 +6,6 @@ const {verificaToken, verificaUserRole} = require('../midlewares/midlewares');
 //comenzarCarrera
 //app.get('/taxista/confirmar',db.comenzarCarrera);
 app.post('/taxista/confirmar', db.comenzarCarrera);
+app.get('/taxista/:id',verificaToken,db.getDriverById);
 
 module.exports = app;
