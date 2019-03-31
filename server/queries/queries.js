@@ -63,10 +63,6 @@ const createDirFav = (request, response) => {
     pool.query('INSERT INTO dir_fav (num_cel_u, nombre_dir, coords_gps_u) VALUES ($1, $2, $3)',
         [body.cel, body.nombre, body.coords], (error, results) => {
             if (error) {
-                console.log(body.cel);
-                console.log(body.nombre);
-                console.log(body.coords);
-                console.log(error);
                 return response.status(400).json({
                     ok: false,
                     err: error
@@ -125,6 +121,61 @@ const createTaxista = (request, response) => {
             });
     }
 
+};
+
+
+const loginTaxista = (request, response) => {
+    let body = request.body;
+    const schema = {
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
+        pass: Joi.string().min(8).required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT * FROM taxista WHERE id_taxista = $1', [body.id_taxista], (error, results) => {
+        if (error) {
+            return response.status(404).json({
+                ok: false,
+                error
+            });
+        }
+
+        if (!results.rows[0]) {
+            return response.status(400).json({
+                ok: false,
+                mensaje: 'Usuario o contraseña incorrectos'
+            });
+        }
+
+
+        if (!bcrypt.compareSync(body.pass, results.rows[0].password_t)) {
+            return response.status(400).json({
+                ok: false,
+                mensaje: 'Usuario o contraseña incorrectos',
+            });
+        }
+
+        let taxista = {
+            numeroCelular: results.rows[0].num_cel_t,
+            nombre: results.rows[0].nombre_t,
+            apellido: results.rows[0].apellido_t,
+            idTaxista: results.rows[0].id_taxista,
+            role: 'Taxista'
+        };
+
+        let token = jwt.sign({taxista}, process.env.SEED, {expiresIn: 14400}); // 4 horas
+
+        response.status(200).json({
+            ok: true,
+            token,
+            taxista 
+        });
+    });
 };
 
 const updateUser = (request, response) => {
@@ -270,8 +321,19 @@ const getUserById = (request, response) => {
     });
 };
 
-const pedirCarrera = (request, response) => {
+const getDriverById = (request, response) => {
+    pool.query('SELECT * FROM perfiles_taxistas WHERE numero_de_identificacion = $1', [request.params.id], (error, results) => {
+        if (error) {
+            return response.status(400).json({
+                ok: false,
+                err: error
+            });
+        }
+        response.status(200).json(results.rows);
+    });
+};
 
+const pedirCarrera = (request, response) => {
     const body = request.body;
     const schema = {
         num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
@@ -280,7 +342,7 @@ const pedirCarrera = (request, response) => {
     };
 
     const {error} = Joi.validate(request.body, schema);
-
+    
     if (error) {
         return response.status(400).send(error.details[0].message);
     }
@@ -507,6 +569,7 @@ module.exports = {
     pedirCarrera, //Permite al usuario pedir un taxi
     createDirFav,
     comenzarCarrera, //Permite al taxista saber si ha sido solicitado, en caso de serlo puede aceptar la carrera
-    confirmarCarrera
+    confirmarCarrera,
+    loginTaxista,
+    getDriverById
 };
-
