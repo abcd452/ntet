@@ -191,6 +191,59 @@ const loginUser = (request, response) => {
 
 };
 
+const loginTaxista = (request, response) => {
+    let body = request.body;
+    const schema = {
+        id_taxista: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        pass: Joi.string().min(8).required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT * FROM taxista WHERE id_taxista = $1', [body.id_taxista, ], (error, results) => {
+        if (error) {
+            return response.status(404).json({
+                ok: false,
+                error
+            });
+        }
+
+        if (!results.rows[0]) {
+            return response.status(400).json({
+                ok: false,
+                mensaje: 'Usuario o contraseña incorrectos'
+            });
+        }
+
+
+        if (!bcrypt.compareSync(body.pass, results.rows[0].password_t)) {
+            return response.status(400).json({
+                ok: false,
+                mensaje: 'Usuario o contraseña incorrectos',
+            });
+        }
+
+        let taxista = {
+            numeroCelular: results.rows[0].num_cel_t,
+            nombre: results.rows[0].nombre_t,
+            apellido: results.rows[0].apellido_t,
+            idTaxista: resutls.rows[0].id_taxista,
+            role: 'Taxista'
+        };
+
+        let token = jwt.sign({Taxista}, process.env.SEED, {expiresIn: 14400}); // 4 horas
+
+        response.status(200).json({
+            ok: true,
+            token,
+            Taxista
+        });
+    });
+};
 
 const getDirections = (request, response) => {
     pool.query('SELECT * FROM dir_fav WHERE num_cel_u = $1', [request.params.id], (error, result) => {
@@ -232,7 +285,7 @@ const pedirCarrera = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT * FROM closest($1)', [body.coordsI], (error, results) => {
+    pool.query('SELECT * FROM closest($1)', [body.coordsI, body.id_taxista], (error, results) => {
         if (error) {
             return response.status(404).json({
                 ok: false,
@@ -257,6 +310,16 @@ const pedirCarrera = (request, response) => {
 
 const comenzarCarrera = (request, response) => {
     const body = request.body;
+
+    const schema = {
+        id_taxista: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
 
     console.log('comenzando carrera...');
     let usuario_busqueda; //usuario al que el taxista le acepto la carrera
@@ -383,6 +446,51 @@ const confirmarCarrera = (request, response) => {
             message: 'Su solicitud no ha sido aceptada'
         });
     }
+};
+
+const terminarCarrera = (request, response) => {
+    const body = request.body;
+
+    const schema = {
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
+        placa: Joi.string().length(6).required().regex(/^[A-Z0-9]+$/),
+        coordsF: Joi.string().required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT terminar_carrera($1, $2, $3, $4)',
+        [body.num, body.id_taxista, body.placa, body.coordsF], (error, results) => {
+            if (error) {
+                return response.status(404).json({
+                    ok: false,
+                    err: error
+                });
+            }
+
+            let vistaDeTaxista = {
+                nombreCompleto: results.rows[0].nombre_completo,
+                numeroCelTaxista: results.rows[0].numero_de_celular,
+                placa: results.rows[0].placa,
+                marcaModelo: results.rows[0].marca_y_modelo,
+                numeroDeViajes: results.rows[0].numero_de_viajes,
+                puntaje: results.rows[0].puntaje
+            };
+            response.status(200).json({
+                ok: true,
+                vistaDeTaxista,
+                message: 'La Carrera ha comenzado',
+            });
+
+
+        });
+
+
 };
 
 
