@@ -6,6 +6,8 @@ const connectionData = require('../config/config').connectionData;
 const pool = new Pool(connectionData);
 let carrerasPorTomar = new Array();
 let usuariosAceptados = new Array();
+let usuariosPorNotificar = new Array();
+let usuariosPorCalificar = new Array();
 
 // ALL QUERIES, HERE: 
 
@@ -14,8 +16,8 @@ const createUser = (request, response) => {
 
     const schema = {
         cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
-        name: Joi.string().min(3).max(50).required().regex(/^[a-zA-Z]+$/),
-        ap: Joi.string().min(3).max(50).required().regex(/^[a-zA-Z]+$/),
+        name: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
+        ap: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
         tc: Joi.string().length(16).required().regex(/^[0-9]+$/),
         pass: Joi.string().min(8).required()
     };
@@ -87,8 +89,8 @@ const createTaxista = (request, response) => {
 
     const schema = {
         id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        nombre_t: Joi.string().min(3).max(50).required().regex(/^[a-zA-Z]+$/),
-        apellido_t: Joi.string().min(3).max(50).required().regex(/^[a-zA-Z]+$/),
+        nombre_t: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
+        apellido_t: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
         num_cel_t: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
         password_t: Joi.string().min(8).required(),
         num_cuenta: Joi.string().max(24).required().regex(/^[0-9]+$/)
@@ -120,62 +122,6 @@ const createTaxista = (request, response) => {
                 });
             });
     }
-
-};
-
-
-const loginTaxista = (request, response) => {
-    let body = request.body;
-    const schema = {
-        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        pass: Joi.string().min(8).required()
-    };
-
-    const {error} = Joi.validate(request.body, schema);
-
-    if (error) {
-        return response.status(400).send(error.details[0].message);
-    }
-
-    pool.query('SELECT * FROM taxista WHERE id_taxista = $1', [body.id_taxista], (error, results) => {
-        if (error) {
-            return response.status(404).json({
-                ok: false,
-                error
-            });
-        }
-
-        if (!results.rows[0]) {
-            return response.status(400).json({
-                ok: false,
-                mensaje: 'Usuario o contraseña incorrectos'
-            });
-        }
-
-
-        if (!bcrypt.compareSync(body.pass, results.rows[0].password_t)) {
-            return response.status(400).json({
-                ok: false,
-                mensaje: 'Usuario o contraseña incorrectos',
-            });
-        }
-
-        let taxista = {
-            numeroCelular: results.rows[0].num_cel_t,
-            nombre: results.rows[0].nombre_t,
-            apellido: results.rows[0].apellido_t,
-            idTaxista: results.rows[0].id_taxista,
-            role: 'Taxista'
-        };
-
-        let token = jwt.sign({taxista}, process.env.SEED, {expiresIn: 14400}); // 4 horas
-
-        response.status(200).json({
-            ok: true,
-            token,
-            taxista 
-        });
-    });
 };
 
 const updateUser = (request, response) => {
@@ -196,7 +142,7 @@ const loginUser = (request, response) => {
 
     const {error} = Joi.validate(request.body, schema);
 
-    if (error){
+    if (error) {
         return response.status(400).send(error.details[0].message);
     }
 
@@ -244,8 +190,9 @@ const loginUser = (request, response) => {
 
 const loginTaxista = (request, response) => {
     let body = request.body;
+    console.log(body);
     const schema = {
-        id_taxista: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
         pass: Joi.string().min(8).required()
     };
 
@@ -255,14 +202,15 @@ const loginTaxista = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT * FROM taxista WHERE id_taxista = $1', [body.id_taxista, ], (error, results) => {
+    pool.query('SELECT * FROM taxista WHERE id_taxista = $1', [body.id_taxista], (error, results) => {
         if (error) {
+            console.log(error);
             return response.status(404).json({
                 ok: false,
                 error
             });
         }
-
+        console.log(results.rows[0].id_taxista);
         if (!results.rows[0]) {
             return response.status(400).json({
                 ok: false,
@@ -282,29 +230,29 @@ const loginTaxista = (request, response) => {
             numeroCelular: results.rows[0].num_cel_t,
             nombre: results.rows[0].nombre_t,
             apellido: results.rows[0].apellido_t,
-            idTaxista: resutls.rows[0].id_taxista,
+            idTaxista: results.rows[0].id_taxista,
             role: 'Taxista'
         };
 
-        let token = jwt.sign({Taxista}, process.env.SEED, {expiresIn: 14400}); // 4 horas
+        let token = jwt.sign({taxista}, process.env.SEED, {expiresIn: 14400}); // 4 horas
 
         response.status(200).json({
             ok: true,
             token,
-            Taxista
+            taxista
         });
     });
 };
 
 const getDirections = (request, response) => {
     pool.query('SELECT * FROM dir_fav WHERE num_cel_u = $1', [request.params.id], (error, result) => {
-      if(error){
-        return response.status(400).json({
-          ok: false,
-          err:error  
-        });  
-      }
-      response.status(200).json(results.rows);  
+        if (error) {
+            return response.status(400).json({
+                ok: false,
+                err: error
+            });
+        }
+        response.status(200).json(results.rows);
     });
 };
 
@@ -334,24 +282,42 @@ const getDriverById = (request, response) => {
 };
 
 const pedirCarrera = (request, response) => {
+    console.log('pedirCarrera');
     const body = request.body;
     const schema = {
         num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
-        coordsI: Joi.string().required(),
-        coordsF: Joi.string().required()
+        coordsI: Joi.string().required().regex(/^[(]{1}[-]{0,1}[0-9]+[.]{1}[0-9]+[,]{1}[" "]{0,1}[-]{0,1}[0-9]+[.]{1}[0-9]+[)]{1}$/),
+        coordsF: Joi.string().required().regex(/^[(]{1}[-]{0,1}[0-9]+[.]{1}[0-9]+[,]{1}[" "]{0,1}[-]{0,1}[0-9]+[.]{1}[0-9]+[)]{1}$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
-    
+
     if (error) {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT * FROM closest($1)', [body.coordsI, body.id_taxista], (error, results) => {
+    for (let i = 0; i < carrerasPorTomar.length; i++) {
+        if (body.num === carrerasPorTomar[i][0]) {
+            return response.status(404).json({
+                ok: false,
+                message: 'Usted se encuentra en una carrera ahora no puede buscar'
+            });
+        }
+    }
+
+    pool.query('SELECT * FROM closest($1, $2)', [body.coordsI, body.num], (error, results) => {
         if (error) {
             return response.status(404).json({
                 ok: false,
-                err: error
+                err: error,
+                message: 'No hay taxis disponibles en este momento'
+            });
+        }
+
+        if (results.rows[0].id_taxista === 'error'){
+            return response.status(404).json({
+                ok: false,
+                message: 'Usted se encuentra en una carrera ahora no puede buscar'
             });
         }
 
@@ -365,16 +331,16 @@ const pedirCarrera = (request, response) => {
         for (let i = 0; i < results.rows.length; i++) {
             let meter = [body.num, results.rows[i].id_taxista, results.rows[i].placa, body.coordsI, body.coordsF];
             carrerasPorTomar.push(meter);
-            console.log(carrerasPorTomar[i]);
         }
     });
 };
 
 const comenzarCarrera = (request, response) => {
+    console.log('comenzarCarrera');
     const body = request.body;
 
     const schema = {
-        id_taxista: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/)
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -383,13 +349,12 @@ const comenzarCarrera = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    console.log('comenzando carrera...');
     let usuario_busqueda; //usuario al que el taxista le acepto la carrera
     let placaTaxista, coordsI, coordsF;
 
-    function existe (x){
-        for (let i = 0; i < carrerasPorTomar.length; i++){
-            if (x === carrerasPorTomar[i][1]){
+    function existe(x) {
+        for (let i = 0; i < carrerasPorTomar.length; i++) {
+            if (x === carrerasPorTomar[i][1]) {
                 usuario_busqueda = carrerasPorTomar[i][0];
                 placaTaxista = carrerasPorTomar[i][2];
                 coordsI = carrerasPorTomar[i][3];
@@ -412,19 +377,33 @@ const comenzarCarrera = (request, response) => {
         }
     }
 
-    if (existe(body.id_taxista)){
-        response.status(201).json({
-            ok: true,
-            message: `Carrera encontrada!`,
-            busqueda: {
-                usuario: usuario_busqueda,
-                taxista: body.id_taxista
-            }
-        });
-        borrar(usuario_busqueda);
-        usuariosAceptados.push([usuario_busqueda, body.id_taxista, placaTaxista, coordsI, coordsF]);
-        console.log(carrerasPorTomar);
+    if (existe(body.id_taxista)) {
+        pool.query('SELECT * FROM taxista_a_usuario($1)',
+            [usuario_busqueda], (error, results) => {
+                if (error) {
+                    return response.status(404).json({
+                        ok: false,
+                        err: error
+                    });
+                }
+
+                let vistaDeUsuario = {
+                    nombreCompleto: results.rows[0].nombre_completo,
+                    numeroCelUsuario: results.rows[0].numero_de_celular,
+                    numeroDeViajes: results.rows[0].numero_de_viajes
+                };
+
+                response.status(201).json({
+                    ok: true,
+                    message: `Carrera encontrada!`,
+                    vistaDeUsuario
+                });
+                borrar(usuario_busqueda);
+                usuariosAceptados.push([usuario_busqueda, body.id_taxista, placaTaxista, coordsI, coordsF]);
+            });
+
     } else {
+        console.log('Servicio no solicitado')
         response.status(204).json({
             ok: true,
             message: 'Su servicio no ha sido solicitado'
@@ -433,6 +412,7 @@ const comenzarCarrera = (request, response) => {
 };
 
 const confirmarCarrera = (request, response) => {
+    console.log('confirmarCarrera');
 
     const body = request.body;
     const schema = {
@@ -446,6 +426,7 @@ const confirmarCarrera = (request, response) => {
     }
 
     let taxista, placa, coordsI, coordsF;
+
     //console.log(usuariosAceptados[0][0], usuariosAceptados[0][1], usuariosAceptados[0][2], usuariosAceptados[0][3], usuariosAceptados[0][4]);
 
     function existe(x) {
@@ -462,17 +443,23 @@ const confirmarCarrera = (request, response) => {
         }
         return false;
     }
-    //console.log(taxista, placa, coordsI, coordsF);
 
     //comenzar_carrera('3167434500', '1234', 'AAA111', '(3.380049,-76.536052)', '(3.382234,-76.537919)');
 
     if (existe(body.num)) {
-        pool.query('SELECT comenzar_carrera($1, $2, $3, $4, $5)',
+        pool.query('SELECT * FROM comenzar_carrera($1, $2, $3, $4, $5)',
             [body.num, taxista, placa, coordsI, coordsF], (error, results) => {
                 if (error) {
                     return response.status(400).json({
                         ok: false,
                         err: error
+                    });
+                }
+
+                if (!results.rows[0].logrado){
+                    return response.status(400).json({
+                        ok: false,
+                        message: 'No se pudo comenzar la carrera, el taxista o usuario se encuentran en una carrera'
                     });
                 }
 
@@ -494,6 +481,7 @@ const confirmarCarrera = (request, response) => {
                             numeroDeViajes: results.rows[0].numero_de_viajes,
                             puntaje: results.rows[0].puntaje
                         };
+
                         response.status(200).json({
                             ok: true,
                             vistaDeTaxista,
@@ -511,13 +499,13 @@ const confirmarCarrera = (request, response) => {
 };
 
 const terminarCarrera = (request, response) => {
+    console.log('terminarCarrera');
+    //Sucede cuando el taxista le da al boton de terminar carrera
     const body = request.body;
 
     const schema = {
-        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
         id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        placa: Joi.string().length(6).required().regex(/^[A-Z0-9]+$/),
-        coordsF: Joi.string().required()
+        coordsF: Joi.string().required().regex(/^[(]{1}[-]{0,1}[0-9]+[.]{1}[0-9]+[,]{1}[" "]{0,1}[-]{0,1}[0-9]+[.]{1}[0-9]+[)]{1}$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -526,50 +514,192 @@ const terminarCarrera = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT terminar_carrera($1, $2, $3, $4)',
-        [body.num, body.id_taxista, body.placa, body.coordsF], (error, results) => {
+    pool.query('SELECT num_cel_u, placa FROM  carreras_en_curso WHERE id_taxista = $1',
+        [body.id_taxista], (error, results) => {
+
             if (error) {
-                return response.status(404).json({
+                return response.status(400).json({
                     ok: false,
                     err: error
                 });
             }
 
-            let vistaDeTaxista = {
-                nombreCompleto: results.rows[0].nombre_completo,
-                numeroCelTaxista: results.rows[0].numero_de_celular,
-                placa: results.rows[0].placa,
-                marcaModelo: results.rows[0].marca_y_modelo,
-                numeroDeViajes: results.rows[0].numero_de_viajes,
-                puntaje: results.rows[0].puntaje
-            };
-            response.status(200).json({
-                ok: true,
-                vistaDeTaxista,
-                message: 'La Carrera ha comenzado',
-            });
+            if (!results.rows[0]) {
+                return response.status(400).json({
+                    ok: false,
+                    mensaje: 'No tiene carreras en curso'
+                });
+            }
 
+            let num = results.rows[0].num_cel_u;
+            let placa = results.rows[0].placa;
+
+            pool.query('SELECT * from terminar_carrera($1, $2, $3, $4)',
+                [num, body.id_taxista, placa, body.coordsF], (error, results) => {
+
+                    if (error) {
+                        return response.status(404).json({
+                            ok: false,
+                            err: error
+                        });
+                    }
+
+                    usuariosPorNotificar.push([num, (results.rows[0].costo)]);
+
+                    usuariosPorCalificar.push([num, body.id_taxista]);
+                    console.log(usuariosPorCalificar);
+
+                    response.status(200).json({
+                        ok: true,
+                        costo: (results.rows[0].costo * 0.6),
+                        message: 'La Carrera ha terminado',
+                    });
+                });
 
         });
+};
+
+const notificarCarreraTerminada = (request, response) => {
+    console.log('notificarCarreraTerminada');
+    //Sucede cuando el taxista le da al boton de terminar carrera (notifica al usuario que la carrera termino)
+    const body = request.body;
+
+    const schema = {
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    for (let i = 0; i < usuariosPorNotificar.length; i++) {
+        if (usuariosPorCalificar[i][0] === body.num) {
+            response.status(200).json({
+                ok: true,
+                message: 'La Carrera ha terminado',
+                costo: usuariosPorNotificar[i][1]
+            });
+            usuariosPorNotificar.splice(i, 1);
+            return;
+        }
+    }
+
+    response.status(204).json({
+        ok: true,
+        message: 'La carrera no ha terminado'
+    });
+};
+
+const calificarTaxista = (request, response) => {
+    console.log('calificarTaxista');
+    console.log(usuariosPorCalificar);
+    const body = request.body;
+
+    const schema = {
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        puntaje: Joi.number().integer().greater(-1).less(6).required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    //ingresar_puntaje(puntaje_otorgado integer, identificacion character varying, numero_cel character varying)
+    for (let i = 0; i < usuariosPorCalificar.length; i++) {
+        if (usuariosPorCalificar[i][0] === body.num) {
+            pool.query('SELECT ingresar_puntaje($1, $2, $3)',
+                [parseInt(body.puntaje, 10), usuariosPorCalificar[i][1], body.num], (error, results) => {
+                    if (error) {
+                        return response.status(400).json({
+                            ok: false,
+                            err: error
+                        });
+                    }
+
+                    taxista = usuariosPorCalificar[i][1];
+                    usuariosPorCalificar.splice(i, 1);
+
+                    return response.status(200).json({
+                        ok: true,
+                        message: 'Ha califica al taxista',
+                        puntaje: body.puntaje,
+                        taxista: taxista
+                    });
+
+                });
+        } else {
+            response.status(204).json({
+                ok: true,
+                message: 'No tiene carreras pendientes por calificar'
+            });
+        }
+    }
+
+};
+
+const registrarTaxi = (request, response) => {
+    const body = request.body;
+
+    const schema = {
+        placa: Joi.string().length(6).required().regex(/[A-Z]{3}[0-9]{3}/),
+        baul: Joi.string().max(25).required().regex(/^[A-Z0-9a-z]+$/),
+        soat: Joi.string().required().max(50).regex(/^[0-9]+$/),
+        modelo: Joi.string().max(50).required().regex(/^[0-9A-Za-z]+$/),
+        marca: Joi.string().max(50).required().regex(/^[0-9A-Za-z]+$/),
+        year: Joi.date().min('1900').required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('INSERT INTO taxi VALUES ($1, $2, $3, $4, $5, $6)',
+        [body.placa, body.baul, body.soat, body.modelo, body.marca, body.year], (error, results) => {
+            if (error) {
+                return response.status(400).json({
+                    ok: false,
+                    err: error,
+                    message: 'Otro taxi con esa placa se encuentra registrado'
+                });
+            }
+
+            response.status(201).json({
+                ok: true,
+                message: `Taxi registrado con exito`,
+                usuario: {
+                    placa: body.placa,
+                    soat: body.soat,
+                    marca: body.marca,
+                    modelo: body.modelo
+                }
+            });
+        })
 
 
 };
 
-
-
-
 module.exports = {
-    createUser, //Crea el usuario
-    createTaxista, //Crea el taxista
-    getUserById,
+    createUser, //Crea una cuenta de usuario (roll usuario)
+    createTaxista, //Crea una cuenta de taxista (roll taxista)
+    getUserById, //Da la info de un usuario especifico (roll usuario)
     deleteUser,
-    updateUser,
-    loginUser, //Logea al usuario a la aplicacion
-    getDirections,
-    pedirCarrera, //Permite al usuario pedir un taxi
-    createDirFav,
-    comenzarCarrera, //Permite al taxista saber si ha sido solicitado, en caso de serlo puede aceptar la carrera
-    confirmarCarrera,
-    loginTaxista,
-    getDriverById
+    updateUser, //Actualiza la info de un usuario en particular (roll usuario)
+    loginUser, //Logea al usuario a la aplicacion (roll usuario)
+    getDirections, //Retorna las direcciones favoritas del usuario (roll usuario)
+    pedirCarrera, //Permite al usuario pedir un taxi (roll usuario)
+    createDirFav, //Permite al usuarip guardar una direccion especifica (roll usuario)
+    comenzarCarrera, //Permite al taxista saber si ha sido solicitado, en caso de serlo puede aceptar la carrera (roll taxista)
+    confirmarCarrera, //Notifica al usuario que su carrera ha sido aceptada (roll usuario)
+    loginTaxista, //Logea al taxista a la aplicacion (roll taxista)
+    getDriverById, //Da la info de un taxista especifico (roll taxista)
+    terminarCarrera, //Permite al taxista terminar una carrera (roll taxista)
+    notificarCarreraTerminada, //Notifica al usuario que la carrera ha terminado (roll usuario)
+    calificarTaxista, //Permite al usuario calificar la carrera que acabo de tener (roll usuario)
+    registrarTaxi //Permite al taxista registrar un taxi
 };
