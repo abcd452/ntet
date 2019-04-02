@@ -594,7 +594,6 @@ const notificarCarreraTerminada = (request, response) => {
 
 const calificarTaxista = (request, response) => {
     console.log('calificarTaxista');
-    console.log(usuariosPorCalificar);
     const body = request.body;
 
     const schema = {
@@ -645,7 +644,7 @@ const registrarTaxi = (request, response) => {
     const body = request.body;
 
     const schema = {
-        placa: Joi.string().length(6).required().regex(/[A-Z]{3}[0-9]{3}/),
+        placa: Joi.string().length(6).required().regex(/^[A-Z]{3}[0-9]{3}$/),
         baul: Joi.string().max(25).required().regex(/^[A-Z0-9a-z]+$/),
         soat: Joi.string().required().max(50).regex(/^[0-9]+$/),
         modelo: Joi.string().max(50).required().regex(/^[0-9A-Za-z]+$/),
