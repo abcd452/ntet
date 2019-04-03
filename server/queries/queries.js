@@ -81,7 +81,6 @@ const createDirFav = (request, response) => {
                 }
             });
         })
-
 };
 
 const createTaxista = (request, response) => {
@@ -190,7 +189,7 @@ const loginUser = (request, response) => {
 
 const loginTaxista = (request, response) => {
     let body = request.body;
-    console.log(body);
+
     const schema = {
         id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
         pass: Joi.string().min(8).required()
@@ -204,13 +203,13 @@ const loginTaxista = (request, response) => {
 
     pool.query('SELECT * FROM taxista WHERE id_taxista = $1', [body.id_taxista], (error, results) => {
         if (error) {
-            console.log(error);
+
             return response.status(404).json({
                 ok: false,
                 error
             });
         }
-        console.log(results.rows[0].id_taxista);
+
         if (!results.rows[0]) {
             return response.status(400).json({
                 ok: false,
@@ -286,8 +285,8 @@ const pedirCarrera = (request, response) => {
     const body = request.body;
     const schema = {
         num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
-        coordsI: Joi.string().required().regex(/^[(]{1}[-]{0,1}[0-9]+[.]{1}[0-9]+[,]{1}[" "]{0,1}[-]{0,1}[0-9]+[.]{1}[0-9]+[)]{1}$/),
-        coordsF: Joi.string().required().regex(/^[(]{1}[-]{0,1}[0-9]+[.]{1}[0-9]+[,]{1}[" "]{0,1}[-]{0,1}[0-9]+[.]{1}[0-9]+[)]{1}$/)
+        coordsI: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/),
+        coordsF: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -427,8 +426,6 @@ const confirmarCarrera = (request, response) => {
 
     let taxista, placa, coordsI, coordsF;
 
-    //console.log(usuariosAceptados[0][0], usuariosAceptados[0][1], usuariosAceptados[0][2], usuariosAceptados[0][3], usuariosAceptados[0][4]);
-
     function existe(x) {
         for (let i = 0; i < usuariosAceptados.length; i++) {
             if (x === usuariosAceptados[i][0]) {
@@ -505,8 +502,8 @@ const terminarCarrera = (request, response) => {
 
     const schema = {
         id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        coordsF: Joi.string().required().regex(/^[(]{1}[-]{0,1}[0-9]+[.]{1}[0-9]+[,]{1}[" "]{0,1}[-]{0,1}[0-9]+[.]{1}[0-9]+[)]{1}$/)
-    };
+        coordsF: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
+    };//(2.2, 2.2)
 
     const {error} = Joi.validate(request.body, schema);
 
@@ -547,7 +544,6 @@ const terminarCarrera = (request, response) => {
                     usuariosPorNotificar.push([num, (results.rows[0].costo)]);
 
                     usuariosPorCalificar.push([num, body.id_taxista]);
-                    console.log(usuariosPorCalificar);
 
                     response.status(200).json({
                         ok: true,
@@ -679,9 +675,47 @@ const registrarTaxi = (request, response) => {
                 }
             });
         })
-
-
 };
+
+const comenzarServicio = (request, response) => {
+    const body = request.body;
+
+    const schema = {
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
+        coordsTaxista: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/),
+        placa: Joi.string().length(6).required().regex(/^[A-Z]{3}[0-9]{3}$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT * FROM loggear_taxista($1, $2, $3)',
+        [body.id_taxista, body.coordsTaxista, body.placa], (error, results) => {
+            if (error) {
+                return response.status(400).json({
+                    ok: false,
+                    err: error,
+                    message: 'Otro taxi con esa placa se encuentra registrado'
+                });
+            }
+
+            response.status(201).json({
+                ok: true,
+                message: `Taxi registrado con exito`,
+                usuario: {
+                    placa: body.placa,
+                    nombre: results.rows[0].nombre,
+                    identificaicon: body.id_taxista,
+                    coordenadas: body.coordsTaxista
+                }
+            });
+        })
+};
+
+
 
 module.exports = {
     createUser, //Crea una cuenta de usuario (roll usuario)
@@ -700,5 +734,6 @@ module.exports = {
     terminarCarrera, //Permite al taxista terminar una carrera (roll taxista)
     notificarCarreraTerminada, //Notifica al usuario que la carrera ha terminado (roll usuario)
     calificarTaxista, //Permite al usuario calificar la carrera que acabo de tener (roll usuario)
-    registrarTaxi //Permite al taxista registrar un taxi
+    registrarTaxi, //Permite al taxista registrar un taxi
+    comenzarServicio
 };
