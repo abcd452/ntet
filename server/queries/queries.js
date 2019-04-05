@@ -35,6 +35,7 @@ const createUser = (request, response) => {
                         err: error
                     });
                 }
+
                 response.status(201).json({
                     ok: true,
                     message: `Usuario: ${body.name} ${body.ap} con celular: ${body.cel} creado con exito`,
@@ -53,7 +54,7 @@ const createDirFav = (request, response) => {
     const schema = {
         cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
         nombre: Joi.string().min(1).max(250).required(),
-        coords: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
+        coords: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,30})|180[.]0{1,30})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,30})|90[.]0{1,30})[)]{1}$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -62,8 +63,30 @@ const createDirFav = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('INSERT INTO dir_fav (num_cel_u, nombre_dir, coords_gps_u) VALUES ($1, $2, $3)',
-        [body.cel, body.nombre, body.coords], (error, results) => {
+    function insertarDirFav(){
+        pool.query('INSERT INTO dir_fav (num_cel_u, nombre_dir, coords_gps_u) VALUES ($1, $2, $3)',
+            [body.cel, body.nombre, body.coords], (error, results) => {
+                if (error) {
+                    return response.status(400).json({
+                        ok: false,
+                        err: error
+                    });
+                }
+
+                response.status(201).json({
+                    ok: true,
+                    message: `Direccion guardada con exito`,
+                    usuario: {
+                        nombre: body.nombre,
+                        coords: body.coords,
+                        usuario: body.cel
+                    }
+                });
+            })
+    }
+
+    pool.query('SELECT * FROM dir_fav WHERE num_cel_u = $1',
+        [body.cel], (error, results) => {
             if (error) {
                 return response.status(400).json({
                     ok: false,
@@ -71,16 +94,34 @@ const createDirFav = (request, response) => {
                 });
             }
 
-            response.status(201).json({
-                ok: true,
-                message: `Direccion guardada con exito`,
-                usuario: {
-                    nombre: body.nombre,
-                    coords: body.coords,
-                    usuario: body.cel
+            if (!results.rows[0]){
+                insertarDirFav();
+            }
+
+            let cascaron = body.coords.replace(/[0-9]|[.]/g, '').split(',');
+            let numerosCoords = body.coords.replace(/[^0-9.,]/g, '').split(',');
+            let resuBody = cascaron[0] + numerosCoords[0].split('.')[0] + '.' + numerosCoords[0].split('.')[1].substring(0, 3) + ',' +
+                numerosCoords[1].split('.')[0] + '.' + numerosCoords[1].split('.')[1].substring(0, 3) + cascaron[1];
+
+            for (let i = 0; i < results.rows.length; i++) {
+                let resu = '(' + results.rows[i].coords_gps_u.x.toString().split('.')[0] + '.' + results.rows[i].coords_gps_u.x.toString().split('.')[1].substring(0, 3) +',' +
+                    results.rows[i].coords_gps_u.y.toString().split('.')[0] + '.' + results.rows[i].coords_gps_u.y.toString().split('.')[1].substring(0, 3) + ')';
+
+                if (results.rows[i].nombre_dir === body.nombre) {
+                    return response.status(400).json({
+                        ok: false,
+                        message: 'El nombre que intenta poner ya existe'
+                    });
+                } else if (resu === resuBody) {
+                    return response.status(400).json({
+                        ok: false,
+                        message: 'Ya tiene otra direccion guardada en la misma coordenada'
+                    });
+                } else if (i === results.rows.length - 1) {
+                    insertarDirFav();
                 }
-            });
-        })
+            }
+        });
 };
 
 const createTaxista = (request, response) => {
@@ -136,7 +177,7 @@ const updateUser = (request, response) => {
     const {error} = Joi.validate(request.body, schema);
 
     if (error) {
-        return response.status(400).send(error.details[0].message); //UPDATE films SET kind = 'Dramatic' WHERE kind = 'Drama';
+        return response.status(400).send(error.details[0].message);
     }
 
     pool.query('UPDATE usuario SET nombre_u = $2, apellido_u = $3 WHERE num_cel_u = $1',
@@ -165,7 +206,7 @@ const updateDirFav = (request, response) => {
     const schema = {
         cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
         nombre: Joi.string().min(1).max(250).required(),
-        coords: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
+        idDirFav: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -174,8 +215,8 @@ const updateDirFav = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('UPDATE dir_fav SET nombre_dir = $2, coords_gps_u = $3 WHERE num_cel_u = $1',
-        [body.cel, body.nombre, body.coords], (error, results) => {
+    pool.query('SELECT * FROM dir_fav WHERE num_cel_u = $1',
+        [body.cel], (error, results) => {
             if (error) {
                 return response.status(400).json({
                     ok: false,
@@ -183,15 +224,34 @@ const updateDirFav = (request, response) => {
                 });
             }
 
-            response.status(201).json({
-                ok: true,
-                message: `Actualizado con exito`,
-                usuario: {
-                    nombre: body.nombre,
-                    apellido: body.apellido,
-                    usuario: body.cel
+            for (let i = 0; i < results.rows.length; i++) {
+                if (results.rows[i].nombre_dir === body.name) {
+                    return response.status(400).json({
+                        ok: false,
+                        message: 'El nombre por el que intenta cambiar ya existe'
+                    });
+                } else if (i === results.rows.length) {
+                    pool.query('UPDATE dir_fav SET nombre_dir = $2 WHERE id_dir_fav = $1',
+                        [body.idDirFav, body.nombre], (error, results) => {
+                            if (error) {
+                                return response.status(400).json({
+                                    ok: false,
+                                    err: error
+                                });
+                            }
+
+                            response.status(201).json({
+                                ok: true,
+                                message: `Actualizado con exito`,
+                                usuario: {
+                                    nombre: body.nombre,
+                                    apellido: body.apellido,
+                                    usuario: body.cel
+                                }
+                            });
+                        })
                 }
-            });
+            }
         })
 };
 
@@ -224,7 +284,6 @@ const deleteUser = (request, response) => {
             });
         }
 
-
         if (!bcrypt.compareSync(body.pass, results.rows[0].password)) {
             return response.status(400).json({
                 ok: false,
@@ -252,6 +311,34 @@ const deleteUser = (request, response) => {
     })
 };
 
+const deleteDirFav = (request, response) => {
+
+    const body = request.body;
+    const schema = {
+        idDirFav: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('DELETE FROM dir_fav WHERE id_dir_fav = $1',
+        [body.idDirFav], (error, results) => {
+            if (error) {
+                return response.status(400).json({
+                    ok: false,
+                    err: error
+                });
+            }
+
+            response.status(201).json({
+                ok: true,
+                message: `Direccion borrada con exito`
+            });
+        })
+};
 
 const loginUser = (request, response) => {
     let body = request.body;
@@ -365,7 +452,7 @@ const loginTaxista = (request, response) => {
 };
 
 const getDirections = (request, response) => {
-    pool.query('SELECT * FROM dir_fav WHERE num_cel_u = $1', [request.params.id], (error, result) => {
+    pool.query('SELECT * FROM dir_fav WHERE num_cel_u = $1', [request.params.id], (error, results) => {
         if (error) {
             return response.status(400).json({
                 ok: false,
@@ -406,8 +493,8 @@ const pedirCarrera = (request, response) => {
     const body = request.body;
     const schema = {
         num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
-        coordsI: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/),
-        coordsF: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
+        coordsI: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,30})|180[.]0{1,30})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,30})|90[.]0{1,30})[)]{1}$/),
+        coordsF: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,30})|180[.]0{1,30})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,30})|90[.]0{1,30})[)]{1}$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -510,7 +597,9 @@ const comenzarCarrera = (request, response) => {
                 let vistaDeUsuario = {
                     nombreCompleto: results.rows[0].nombre_completo,
                     numeroCelUsuario: results.rows[0].numero_de_celular,
-                    numeroDeViajes: results.rows[0].numero_de_viajes
+                    numeroDeViajes: results.rows[0].numero_de_viajes,
+                    ubicacion: coordsI,
+                    destino: coordsF
                 };
 
                 response.status(201).json({
@@ -561,8 +650,6 @@ const confirmarCarrera = (request, response) => {
         }
         return false;
     }
-
-    //comenzar_carrera('3167434500', '1234', 'AAA111', '(3.380049,-76.536052)', '(3.382234,-76.537919)');
 
     if (existe(body.num)) {
         pool.query('SELECT * FROM comenzar_carrera($1, $2, $3, $4, $5)',
@@ -724,7 +811,6 @@ const calificarTaxista = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    //ingresar_puntaje(puntaje_otorgado integer, identificacion character varying, numero_cel character varying)
     for (let i = 0; i < usuariosPorCalificar.length; i++) {
         if (usuariosPorCalificar[i][0] === body.num) {
             pool.query('SELECT ingresar_puntaje($1, $2, $3)',
@@ -803,7 +889,7 @@ const comenzarServicio = (request, response) => {
 
     const schema = {
         id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        coordsTaxista: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/),
+        coordsTaxista: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,30})|180[.]0{1,30})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,30})|90[.]0{1,30})[)]{1}$/),
         placa: Joi.string().length(6).required().regex(/^[A-Z]{3}[0-9]{3}$/)
     };
 
@@ -856,5 +942,6 @@ module.exports = {
     calificarTaxista, //Permite al usuario calificar la carrera que acabo de tener (roll usuario)
     registrarTaxi, //Permite al taxista registrar un taxi
     comenzarServicio,
-    updateDirFav
+    updateDirFav,
+    deleteDirFav
 };
