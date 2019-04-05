@@ -16,9 +16,9 @@ const createUser = (request, response) => {
 
     const schema = {
         cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
-        name: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
-        ap: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
-        tc: Joi.string().length(16).required().regex(/^[0-9]+$/),
+        name: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/),
+        ap: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/),
+        tc: Joi.string().required().creditCard(),
         pass: Joi.string().min(8).required()
     };
 
@@ -52,8 +52,8 @@ const createDirFav = (request, response) => {
     const body = request.body;
     const schema = {
         cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
-        nombre: Joi.string().min(3).max(250).required().regex(/^[a-zA-Z0-9]+$/),
-        coords: Joi.string().min(5).max(80).required()
+        nombre: Joi.string().min(1).max(250).required(),
+        coords: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -88,8 +88,8 @@ const createTaxista = (request, response) => {
 
     const schema = {
         id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        nombre_t: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
-        apellido_t: Joi.string().min(3).max(50).required().regex(/^([A-Z]{1}[a-z]+){1}([" "]{1}[A-Z]{1}[a-z]+)*$/),
+        nombre_t: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/),
+        apellido_t: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/),
         num_cel_t: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
         password_t: Joi.string().min(8).required(),
         num_cuenta: Joi.string().max(24).required().regex(/^[0-9]+$/)
@@ -124,11 +124,132 @@ const createTaxista = (request, response) => {
 };
 
 const updateUser = (request, response) => {
-    //ToDo
+
+    const body = request.body;
+
+    const schema = {
+        cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        nombre: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/),
+        apellido: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message); //UPDATE films SET kind = 'Dramatic' WHERE kind = 'Drama';
+    }
+
+    pool.query('UPDATE usuario SET nombre_u = $2, apellido_u = $3 WHERE num_cel_u = $1',
+        [body.cel, body.nombre, body.apellido], (error, results) => {
+            if (error) {
+                return response.status(400).json({
+                    ok: false,
+                    err: error
+                });
+            }
+
+            response.status(201).json({
+                ok: true,
+                message: `Actualizado con exito`,
+                usuario: {
+                    nombre: body.nombre,
+                    apellido: body.apellido,
+                    usuario: body.cel
+                }
+            });
+        })
+};
+
+const updateDirFav = (request, response) => {
+    const body = request.body;
+    const schema = {
+        cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        nombre: Joi.string().min(1).max(250).required(),
+        coords: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('UPDATE dir_fav SET nombre_dir = $2, coords_gps_u = $3 WHERE num_cel_u = $1',
+        [body.cel, body.nombre, body.coords], (error, results) => {
+            if (error) {
+                return response.status(400).json({
+                    ok: false,
+                    err: error
+                });
+            }
+
+            response.status(201).json({
+                ok: true,
+                message: `Actualizado con exito`,
+                usuario: {
+                    nombre: body.nombre,
+                    apellido: body.apellido,
+                    usuario: body.cel
+                }
+            });
+        })
 };
 
 const deleteUser = (request, response) => {
-    //ToDo
+    let body = request.body;
+
+    const schema = {
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        pass: Joi.string().min(8).required()
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT password, num_cel_u , nombre_u , apellido_u FROM usuario WHERE num_cel_u = $1', [body.num], (error, results) => {
+        if (error) {
+            return response.status(404).json({
+                ok: false,
+                error
+            });
+        }
+
+        if (!results.rows[0]) {
+            return response.status(400).json({
+                ok: false,
+                mensaje: 'Error'
+            });
+        }
+
+
+        if (!bcrypt.compareSync(body.pass, results.rows[0].password)) {
+            return response.status(400).json({
+                ok: false,
+                mensaje: 'Contraseña incorrecta',
+            });
+        } else {
+            pool.query('DELETE FROM usuario WHERE num_cel_u = $1',
+                [body.num], (error, results) => {
+                    if (error) {
+                        return response.status(400).json({
+                            ok: false,
+                            err: error
+                        });
+                    }
+
+                    response.status(201).json({
+                        ok: true,
+                        message: `Usuario borrado con exito`,
+                        usuario: {
+                            usuario: body.cel
+                        }
+                    });
+                })
+        }
+    })
 };
 
 
@@ -195,7 +316,7 @@ const loginTaxista = (request, response) => {
         pass: Joi.string().min(8).required()
     };
 
-    const {error} = Joi.validate(request.body, schema);
+    const {error} = Joi.validate(request.body, schema, escapeHtml);
 
     if (error) {
         return response.status(400).send(error.details[0].message);
@@ -313,7 +434,7 @@ const pedirCarrera = (request, response) => {
             });
         }
 
-        if (results.rows[0].id_taxista === 'error'){
+        if (results.rows[0].id_taxista === 'error') {
             return response.status(404).json({
                 ok: false,
                 message: 'Usted se encuentra en una carrera ahora no puede buscar'
@@ -402,7 +523,7 @@ const comenzarCarrera = (request, response) => {
             });
 
     } else {
-        console.log('Servicio no solicitado')
+        console.log('Servicio no solicitado');
         response.status(204).json({
             ok: true,
             message: 'Su servicio no ha sido solicitado'
@@ -453,7 +574,7 @@ const confirmarCarrera = (request, response) => {
                     });
                 }
 
-                if (!results.rows[0].logrado){
+                if (!results.rows[0].logrado) {
                     return response.status(400).json({
                         ok: false,
                         message: 'No se pudo comenzar la carrera, el taxista o usuario se encuentran en una carrera'
@@ -716,7 +837,6 @@ const comenzarServicio = (request, response) => {
 };
 
 
-
 module.exports = {
     createUser, //Crea una cuenta de usuario (roll usuario)
     createTaxista, //Crea una cuenta de taxista (roll taxista)
@@ -735,5 +855,6 @@ module.exports = {
     notificarCarreraTerminada, //Notifica al usuario que la carrera ha terminado (roll usuario)
     calificarTaxista, //Permite al usuario calificar la carrera que acabo de tener (roll usuario)
     registrarTaxi, //Permite al taxista registrar un taxi
-    comenzarServicio
+    comenzarServicio,
+    updateDirFav
 };
