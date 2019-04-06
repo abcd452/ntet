@@ -760,9 +760,8 @@ const comenzarCarrera = (request, response) => {
             });
 
     } else {
-        console.log('Servicio no solicitado');
-        response.status(204).json({
-            ok: true,
+        response.status(404).json({
+            ok: false,
             message: 'Su servicio no ha sido solicitado'
         });
     }
@@ -844,8 +843,8 @@ const confirmarCarrera = (request, response) => {
 
             });
     } else {
-        response.status(204).json({
-            ok: true,
+        response.status(404).json({
+            ok: false,
             message: 'Su solicitud no ha sido aceptada'
         });
     }
@@ -938,8 +937,8 @@ const notificarCarreraTerminada = (request, response) => {
         }
     }
 
-    response.status(204).json({
-        ok: true,
+    response.status(404).json({
+        ok: false,
         message: 'La carrera no ha terminado'
     });
 };
@@ -1081,8 +1080,7 @@ const terminarServicio = (request, response) => {
     const body = request.body;
 
     const schema = {
-        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        placa: Joi.string().length(6).required().regex(/^[A-Z]{3}[0-9]{3}$/)
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -1091,8 +1089,8 @@ const terminarServicio = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT logout_taxista($1, $2)',
-        [body.id_taxista, body.placa], (error) => {
+    pool.query('SELECT logout_taxista($1)',
+        [body.id_taxista], (error) => {
             if (error) {
                 return response.status(400).json({
                     ok: false,
