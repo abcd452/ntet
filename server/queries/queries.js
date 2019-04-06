@@ -1090,7 +1090,7 @@ const terminarServicio = (request, response) => {
     }
 
     pool.query('SELECT logout_taxista($1)',
-        [body.id_taxista, body.placa], (error) => {
+        [body.id_taxista], (error) => {
             if (error) {
                 return response.status(400).json({
                     ok: false,
