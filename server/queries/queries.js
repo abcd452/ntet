@@ -630,7 +630,7 @@ const revisarEstadoUsuario = (request, response) => {
         }
     }
 
-    pool.query('SELECT esta_en_carrera($1)', [params.num], (error, results) => {
+    pool.query('SELECT * FROM carreras_en_curso WHERE num_cel_u = $1', [params.num], (error, results) => {
         if (error) {
             return response.status(404).json({
                 ok: false,
@@ -638,11 +638,31 @@ const revisarEstadoUsuario = (request, response) => {
             });
         }
 
-        if (results.rows[0].esta_en_carrera){
-            return response.status(200).json({
-                ok: true,
-                estado: `carrera`
-            })
+        if (results.rows[0]){
+            pool.query('SELECT * FROM usuario_a_taxista($1, $2)',
+                [results.rows[0].id_taxista, results.rows[0].placa], (error, results) => {
+                    if (error) {
+                        return response.status(404).json({
+                            ok: false,
+                            err: error
+                        });
+                    }
+
+                    let vistaDeTaxista = {
+                        nombreCompleto: results.rows[0].nombre_completo,
+                        numeroCelTaxista: results.rows[0].numero_de_celular,
+                        placa: results.rows[0].placa,
+                        marcaModelo: results.rows[0].marca_y_modelo,
+                        numeroDeViajes: results.rows[0].numero_de_viajes,
+                        puntaje: results.rows[0].puntaje
+                    };
+
+                    return response.status(200).json({
+                        ok: true,
+                        estado: `carrera`,
+                        vistaDeTaxista
+                    })
+                });
         } else {
             return response.status(200).json({
                 ok: false,
@@ -674,7 +694,7 @@ const revisarEstadoTaxista = (request, response) => {
             });
         }
 
-        if (results.rows[0].esta_en_carrera){
+        if (results.rows[0]){
             return response.status(200).json({
                 ok: true,
                 estado: `carrera`
@@ -858,7 +878,7 @@ const terminarCarrera = (request, response) => {
     const schema = {
         id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
         coordsF: Joi.string().required().regex(/^[(]{1}-{0,1}(((1[0-7][0-9]|[1-9][0-9]|[0-9])[.][0-9]{1,15})|180[.]0{1,15})[,]{1}[" "]{0,1}[-]{0,1}((([1-8][0-9]|[0-9])[.][0-9]{1,15})|90[.]0{1,15})[)]{1}$/)
-    };//(2.2, 2.2)
+    };
 
     const {error} = Joi.validate(request.body, schema);
 
@@ -926,7 +946,7 @@ const notificarCarreraTerminada = (request, response) => {
     }
 
     for (let i = 0; i < usuariosPorNotificar.length; i++) {
-        if (usuariosPorCalificar[i][0] === body.num) {
+        if (usuariosPorNotificar[i][0] === body.num) {
             response.status(200).json({
                 ok: true,
                 message: 'La Carrera ha terminado',
@@ -959,7 +979,7 @@ const calificarTaxista = (request, response) => {
     }
 
     if (usuariosPorCalificar.length === 0){
-        return response.status(204).json({
+        return response.status(404).json({
             ok: true,
             message: 'No tiene carreras pendientes por calificar'
         });
@@ -987,8 +1007,9 @@ const calificarTaxista = (request, response) => {
                     });
 
                 });
-        } else {
-            response.status(204).json({
+        }
+        else if (i === usuariosPorCalificar.length - 1){
+            response.status(404).json({
                 ok: true,
                 message: 'No tiene carreras pendientes por calificar'
             });
