@@ -569,6 +569,13 @@ const pedirCarrera = (request, response) => {
                     });
                 }
 
+                if (!results.rows[0]){
+                    return response.status(404).json({
+                        ok: false,
+                        message: 'No hay taxistas disponibles en su zona, busque mas tarde'
+                    });
+                }
+
                 if (results.rows[0].id_taxista === 'error') {
                     return response.status(404).json({
                         ok: false,
