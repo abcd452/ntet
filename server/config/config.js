@@ -8,11 +8,11 @@ module.exports.connectionData = process.env.connectionData || {
     user: 'postgres',
     host: 'localhost',
     database: 'ntet',
-    password: 'misterio',
+    password: 'mysecretpass',
     port: 5432,
 };
 //==========================//
 
 //=========SEED FOR HASH FUNCTIONS ====//
-process.env.SEED = process.env.SEED || 'misterio';
+process.env.SEED = process.env.SEED || 'mysecretpass';
 
