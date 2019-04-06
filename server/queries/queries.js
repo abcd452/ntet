@@ -507,39 +507,113 @@ const pedirCarrera = (request, response) => {
         if (body.num === carrerasPorTomar[i][0]) {
             return response.status(404).json({
                 ok: false,
-                message: 'Usted se encuentra en una carrera ahora no puede buscar'
+                message: 'Usted ya hizo una solicitud'
             });
         }
     }
 
-    pool.query('SELECT * FROM closest($1, $2)', [body.coordsI, body.num], (error, results) => {
+    pool.query('SELECT existe_usuario($1)', [body.num], (error, results) => {
         if (error) {
             return response.status(404).json({
                 ok: false,
-                err: error,
-                message: 'No hay taxis disponibles en este momento'
+                err: error
             });
         }
 
-        if (results.rows[0].id_taxista === 'error') {
+        if (results.rows[0].existe_usuario) {
+            pool.query('SELECT * FROM closest($1, $2)', [body.coordsI, body.num], (error, results) => {
+                if (error) {
+                    return response.status(404).json({
+                        ok: false,
+                        err: error,
+                        message: 'No hay taxis disponibles en este momento'
+                    });
+                }
+
+                if (results.rows[0].id_taxista === 'error') {
+                    return response.status(404).json({
+                        ok: false,
+                        message: 'Usted se encuentra en una carrera ahora no puede buscar'
+                    });
+                }
+
+                response.status(201).json({
+                    ok: true,
+                    message: `Busqueda con exito, esperando confirmacion del taxista`,
+                    busqueda: {
+                        celular: body.num,
+                    }
+                });
+
+                for (let i = 0; i < results.rows.length; i++) {
+                    let meter = [body.num, results.rows[i].id_taxista, results.rows[i].placa, body.coordsI, body.coordsF];
+                    carrerasPorTomar.push(meter);
+                }
+            });
+        } else {
             return response.status(404).json({
                 ok: false,
-                message: 'Usted se encuentra en una carrera ahora no puede buscar'
+                err: error,
+                message: 'Dicho usuario no existe'
+            });
+        }
+    })
+};
+
+const revisarEstado = (request, response) => {
+    const params = request.params;
+
+    const schema = {
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/)
+    };
+
+    const {error} = Joi.validate(request.params, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    for (let i = 0; i < usuariosPorCalificar.length; i++){
+        if (params.num === usuariosPorCalificar[i][0]){
+            return response.status(201).json({
+                ok: true,
+                estado: `calificando`
+            })
+        }
+    }
+
+    for (let i = 0; i < carrerasPorTomar.length; i++){
+        if (params.num === carrerasPorTomar[i][0]){
+            return response.status(201).json({
+                ok: true,
+                estado: `solicitando`
+            })
+        }
+    }
+
+    pool.query('SELECT esta_en_carrera($1)', [params.num], (error, results) => {
+        if (error) {
+            return response.status(404).json({
+                ok: false,
+                err: error
             });
         }
 
-        response.status(201).json({
-            ok: true,
-            message: `Busqueda con exito, esperando confirmacion del taxista`,
-            busqueda: {
-                celular: body.num,
-            }
-        });
-        for (let i = 0; i < results.rows.length; i++) {
-            let meter = [body.num, results.rows[i].id_taxista, results.rows[i].placa, body.coordsI, body.coordsF];
-            carrerasPorTomar.push(meter);
+        if (results.rows[0].esta_en_carrera){
+            return response.status(201).json({
+                ok: true,
+                estado: `carrera`,
+            })
+        } else {
+            return response.status(201).json({
+                ok: false,
+                estado: `ninguno`,
+            })
         }
+
     });
+
+
 };
 
 const comenzarCarrera = (request, response) => {
@@ -607,6 +681,7 @@ const comenzarCarrera = (request, response) => {
                     message: `Carrera encontrada!`,
                     vistaDeUsuario
                 });
+
                 borrar(usuario_busqueda);
                 usuariosAceptados.push([usuario_busqueda, body.id_taxista, placaTaxista, coordsI, coordsF]);
             });
@@ -811,6 +886,13 @@ const calificarTaxista = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
+    if (usuariosPorCalificar.length === 0){
+        return response.status(204).json({
+            ok: true,
+            message: 'No tiene carreras pendientes por calificar'
+        });
+    }
+
     for (let i = 0; i < usuariosPorCalificar.length; i++) {
         if (usuariosPorCalificar[i][0] === body.num) {
             pool.query('SELECT ingresar_puntaje($1, $2, $3)',
@@ -905,7 +987,7 @@ const comenzarServicio = (request, response) => {
                 return response.status(400).json({
                     ok: false,
                     err: error,
-                    message: 'Otro taxi con esa placa se encuentra registrado'
+                    message: 'El taxi que va a usar se encuentra en uso'
                 });
             }
 
@@ -922,6 +1004,42 @@ const comenzarServicio = (request, response) => {
         })
 };
 
+const terminarServicio = (request, response) => {
+    const body = request.body;
+
+    const schema = {
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
+        placa: Joi.string().length(6).required().regex(/^[A-Z]{3}[0-9]{3}$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT logout_taxista($1, $2)',
+        [body.id_taxista, body.placa], (error, results) => {
+            if (error) {
+                return response.status(400).json({
+                    ok: false,
+                    err: error,
+                    message: 'Otro taxi con esa placa se encuentra registrado'
+                });
+            }
+
+            response.status(201).json({
+                ok: true,
+                message: `Taxi registrado con exito`,
+                usuario: {
+                    placa: body.placa,
+                    nombre: results.rows[0].nombre,
+                    identificaicon: body.id_taxista,
+                    coordenadas: body.coordsTaxista
+                }
+            });
+        })
+};
 
 module.exports = {
     createUser, //Crea una cuenta de usuario (roll usuario)
@@ -943,5 +1061,6 @@ module.exports = {
     registrarTaxi, //Permite al taxista registrar un taxi
     comenzarServicio,
     updateDirFav,
-    deleteDirFav
+    deleteDirFav,
+    revisarEstado
 };
