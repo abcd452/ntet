@@ -12,4 +12,6 @@ app.post('/taxista/terminarCarrera', db.terminarCarrera);
 app.post('/taxista/registrarTaxi', db.registrarTaxi);
 app.post('/taxista/comenzarServicio', db.comenzarServicio);
 
+app.put('/taxista/terminarServicio', db.terminarServicio);
+
 module.exports = app;

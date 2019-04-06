@@ -189,7 +189,7 @@ const updateUser = (request, response) => {
                 });
             }
 
-            response.status(201).json({
+            response.status(200).json({
                 ok: true,
                 message: `Actualizado con exito`,
                 usuario: {
@@ -240,7 +240,7 @@ const updateDirFav = (request, response) => {
                                 });
                             }
 
-                            response.status(201).json({
+                            response.status(200).json({
                                 ok: true,
                                 message: `Actualizado con exito`,
                                 usuario: {
@@ -299,7 +299,7 @@ const deleteUser = (request, response) => {
                         });
                     }
 
-                    response.status(201).json({
+                    response.status(200).json({
                         ok: true,
                         message: `Usuario borrado con exito`,
                         usuario: {
@@ -327,13 +327,13 @@ const deleteDirFav = (request, response) => {
     pool.query('DELETE FROM dir_fav WHERE id_dir_fav = $1',
         [body.idDirFav], (error, results) => {
             if (error) {
-                return response.status(400).json({
+                return response.status(404).json({
                     ok: false,
                     err: error
                 });
             }
 
-            response.status(201).json({
+            response.status(200).json({
                 ok: true,
                 message: `Direccion borrada con exito`
             });
@@ -403,7 +403,7 @@ const loginTaxista = (request, response) => {
         pass: Joi.string().min(8).required()
     };
 
-    const {error} = Joi.validate(request.body, schema, escapeHtml);
+    const {error} = Joi.validate(request.body, schema);
 
     if (error) {
         return response.status(400).send(error.details[0].message);
@@ -411,7 +411,7 @@ const loginTaxista = (request, response) => {
 
     pool.query('SELECT * FROM taxista WHERE id_taxista = $1', [body.id_taxista], (error, results) => {
         if (error) {
-
+            console.log('ete error');
             return response.status(404).json({
                 ok: false,
                 error
@@ -419,6 +419,7 @@ const loginTaxista = (request, response) => {
         }
 
         if (!results.rows[0]) {
+            console.log('Usuario');
             return response.status(400).json({
                 ok: false,
                 mensaje: 'Usuario o contraseña incorrectos'
@@ -427,6 +428,7 @@ const loginTaxista = (request, response) => {
 
 
         if (!bcrypt.compareSync(body.pass, results.rows[0].password_t)) {
+            console.log('Contrase~na');
             return response.status(400).json({
                 ok: false,
                 mensaje: 'Usuario o contraseña incorrectos',
@@ -443,7 +445,7 @@ const loginTaxista = (request, response) => {
 
         let token = jwt.sign({taxista}, process.env.SEED, {expiresIn: 14400}); // 4 horas
 
-        response.status(200).json({
+        return response.status(200).json({
             ok: true,
             token,
             taxista
@@ -575,7 +577,7 @@ const revisarEstado = (request, response) => {
 
     for (let i = 0; i < usuariosPorCalificar.length; i++){
         if (params.num === usuariosPorCalificar[i][0]){
-            return response.status(201).json({
+            return response.status(200).json({
                 ok: true,
                 estado: `calificando`
             })
@@ -584,7 +586,7 @@ const revisarEstado = (request, response) => {
 
     for (let i = 0; i < carrerasPorTomar.length; i++){
         if (params.num === carrerasPorTomar[i][0]){
-            return response.status(201).json({
+            return response.status(200).json({
                 ok: true,
                 estado: `solicitando`
             })
@@ -600,14 +602,14 @@ const revisarEstado = (request, response) => {
         }
 
         if (results.rows[0].esta_en_carrera){
-            return response.status(201).json({
+            return response.status(200).json({
                 ok: true,
-                estado: `carrera`,
+                estado: `carrera`
             })
         } else {
-            return response.status(201).json({
+            return response.status(200).json({
                 ok: false,
-                estado: `ninguno`,
+                estado: `ninguno`
             })
         }
 
@@ -676,7 +678,7 @@ const comenzarCarrera = (request, response) => {
                     destino: coordsF
                 };
 
-                response.status(201).json({
+                response.status(200).json({
                     ok: true,
                     message: `Carrera encontrada!`,
                     vistaDeUsuario
@@ -1019,24 +1021,18 @@ const terminarServicio = (request, response) => {
     }
 
     pool.query('SELECT logout_taxista($1, $2)',
-        [body.id_taxista, body.placa], (error, results) => {
+        [body.id_taxista, body.placa], (error) => {
             if (error) {
                 return response.status(400).json({
                     ok: false,
                     err: error,
-                    message: 'Otro taxi con esa placa se encuentra registrado'
+                    message: 'No se encuentra prestando servicio'
                 });
             }
 
             response.status(201).json({
                 ok: true,
-                message: `Taxi registrado con exito`,
-                usuario: {
-                    placa: body.placa,
-                    nombre: results.rows[0].nombre,
-                    identificaicon: body.id_taxista,
-                    coordenadas: body.coordsTaxista
-                }
+                message: `Ha terminado de prestar servicio, no aparecera en busquedas`
             });
         })
 };
@@ -1062,5 +1058,6 @@ module.exports = {
     comenzarServicio,
     updateDirFav,
     deleteDirFav,
-    revisarEstado
+    revisarEstado,
+    terminarServicio
 };
