@@ -7,7 +7,7 @@ const {verificaToken, verificaUserRole} = require('../midlewares/midlewares');
 
 app.get('/profile/:id',verificaToken, db.getUserById);
 app.get('/profile/dirfav/:id',verificaToken, db.getDirections);
-app.get('/profile/revisarEstado/:num', db.revisarEstado);
+app.get('/profile/revisarEstado/:num', db.revisarEstadoUsuario);
 
 app.post('/profile/dirfav', db.createDirFav); //updateUser
 app.post('/profile/pedirCarrera', db.pedirCarrera);

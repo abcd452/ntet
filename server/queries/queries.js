@@ -181,7 +181,7 @@ const updateUser = (request, response) => {
     }
 
     pool.query('UPDATE usuario SET nombre_u = $2, apellido_u = $3 WHERE num_cel_u = $1',
-        [body.cel, body.nombre, body.apellido], (error, results) => {
+        [body.cel, body.nombre, body.apellido], (error) => {
             if (error) {
                 return response.status(400).json({
                     ok: false,
@@ -196,6 +196,43 @@ const updateUser = (request, response) => {
                     nombre: body.nombre,
                     apellido: body.apellido,
                     usuario: body.cel
+                }
+            });
+        })
+};
+
+const updateTaxista = (request, response) => {
+
+    const body = request.body;
+
+    const schema = {
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
+        nombre: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/),
+        apellido: Joi.string().min(1).max(50).required().regex(/^[^±!@£$%^&*_+§¡€#¢¶•ªº«\\/<>?:;|=.,]{1,50}$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('UPDATE taxista SET nombre_t = $2, apellido_t = $3 WHERE id_taxista = $1',
+        [body.id_taxista, body.nombre, body.apellido], (error) => {
+            if (error) {
+                return response.status(400).json({
+                    ok: false,
+                    err: error
+                });
+            }
+
+            response.status(200).json({
+                ok: true,
+                message: `Actualizado con exito`,
+                taxista: {
+                    nombre: body.nombre,
+                    apellido: body.apellido,
+                    usuario: body.id_taxista
                 }
             });
         })
@@ -562,7 +599,7 @@ const pedirCarrera = (request, response) => {
     })
 };
 
-const revisarEstado = (request, response) => {
+const revisarEstadoUsuario = (request, response) => {
     const params = request.params;
 
     const schema = {
@@ -614,8 +651,42 @@ const revisarEstado = (request, response) => {
         }
 
     });
+};
 
+const revisarEstadoTaxista = (request, response) => {
+    const params = request.params;
 
+    const schema = {
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/)
+    };
+
+    const {error} = Joi.validate(request.params, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    pool.query('SELECT * FROM carreras_en_curso WHERE id_taxista = $1', [params.id_taxista], (error, results) => {
+        if (error) {
+            return response.status(404).json({
+                ok: false,
+                err: error
+            });
+        }
+
+        if (results.rows[0].esta_en_carrera){
+            return response.status(200).json({
+                ok: true,
+                estado: `carrera`
+            })
+        } else {
+            return response.status(200).json({
+                ok: false,
+                estado: `ninguno`
+            })
+        }
+
+    });
 };
 
 const comenzarCarrera = (request, response) => {
@@ -689,9 +760,8 @@ const comenzarCarrera = (request, response) => {
             });
 
     } else {
-        console.log('Servicio no solicitado');
-        response.status(204).json({
-            ok: true,
+        response.status(404).json({
+            ok: false,
             message: 'Su servicio no ha sido solicitado'
         });
     }
@@ -773,8 +843,8 @@ const confirmarCarrera = (request, response) => {
 
             });
     } else {
-        response.status(204).json({
-            ok: true,
+        response.status(404).json({
+            ok: false,
             message: 'Su solicitud no ha sido aceptada'
         });
     }
@@ -867,8 +937,8 @@ const notificarCarreraTerminada = (request, response) => {
         }
     }
 
-    response.status(204).json({
-        ok: true,
+    response.status(404).json({
+        ok: false,
         message: 'La carrera no ha terminado'
     });
 };
@@ -946,7 +1016,7 @@ const registrarTaxi = (request, response) => {
     }
 
     pool.query('INSERT INTO taxi VALUES ($1, $2, $3, $4, $5, $6)',
-        [body.placa, body.baul, body.soat, body.modelo, body.marca, body.year], (error, results) => {
+        [body.placa, body.baul, body.soat, body.modelo, body.marca, body.year], (error) => {
             if (error) {
                 return response.status(400).json({
                     ok: false,
@@ -1010,8 +1080,7 @@ const terminarServicio = (request, response) => {
     const body = request.body;
 
     const schema = {
-        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/),
-        placa: Joi.string().length(6).required().regex(/^[A-Z]{3}[0-9]{3}$/)
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -1020,7 +1089,7 @@ const terminarServicio = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT logout_taxista($1, $2)',
+    pool.query('SELECT logout_taxista($1)',
         [body.id_taxista, body.placa], (error) => {
             if (error) {
                 return response.status(400).json({
@@ -1030,7 +1099,7 @@ const terminarServicio = (request, response) => {
                 });
             }
 
-            response.status(201).json({
+            response.status(200).json({
                 ok: true,
                 message: `Ha terminado de prestar servicio, no aparecera en busquedas`
             });
@@ -1058,6 +1127,8 @@ module.exports = {
     comenzarServicio,
     updateDirFav,
     deleteDirFav,
-    revisarEstado,
-    terminarServicio
+    revisarEstadoUsuario,
+    terminarServicio,
+    revisarEstadoTaxista,
+    updateTaxista
 };
