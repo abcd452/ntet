@@ -6,7 +6,6 @@ const connectionData = require('../config/config').connectionData;
 const pool = new Pool(connectionData);
 let carrerasPorTomar = new Array();
 let usuariosAceptados = new Array();
-let usuariosPorNotificar = new Array();
 let usuariosPorCalificar = new Array();
 
 // ALL QUERIES, HERE: 
@@ -577,7 +576,7 @@ const pedirCarrera = (request, response) => {
                 }
 
                 if (results.rows[0].id_taxista === 'error') {
-                    return response.status(404).json({
+                    return response.status(400).json({
                         ok: false,
                         message: 'Usted se encuentra en una carrera ahora no puede buscar'
                     });
@@ -591,8 +590,11 @@ const pedirCarrera = (request, response) => {
                     }
                 });
 
+                console.log(results);
+
                 for (let i = 0; i < results.rows.length; i++) {
                     let meter = [body.num, results.rows[i].id_taxista, results.rows[i].placa, body.coordsI, body.coordsF];
+                    console.log(meter);
                     carrerasPorTomar.push(meter);
                 }
             });
@@ -923,9 +925,7 @@ const terminarCarrera = (request, response) => {
                         });
                     }
 
-                    usuariosPorNotificar.push([num, (results.rows[0].costo)]);
-
-                    usuariosPorCalificar.push([num, body.id_taxista]);
+                    usuariosPorCalificar.push([num, body.id_taxista, results.rows[0].costo]);
 
                     response.status(200).json({
                         ok: true,
@@ -952,14 +952,13 @@ const notificarCarreraTerminada = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    for (let i = 0; i < usuariosPorNotificar.length; i++) {
-        if (usuariosPorNotificar[i][0] === body.num) {
+    for (let i = 0; i < usuariosPorCalificar.length; i++) {
+        if (usuariosPorCalificar[i][0] === body.num) {
             response.status(200).json({
                 ok: true,
                 message: 'La Carrera ha terminado',
-                costo: usuariosPorNotificar[i][1]
+                costo: usuariosPorCalificar[i][2]
             });
-            usuariosPorNotificar.splice(i, 1);
             return;
         }
     }
