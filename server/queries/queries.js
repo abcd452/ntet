@@ -94,7 +94,7 @@ const createDirFav = (request, response) => {
             }
 
             if (!results.rows[0]){
-                insertarDirFav();
+                return insertarDirFav();
             }
 
             let cascaron = body.coords.replace(/[0-9]|[.]/g, '').split(',');
@@ -242,7 +242,7 @@ const updateDirFav = (request, response) => {
     const schema = {
         cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
         nombre: Joi.string().min(1).max(250).required(),
-        idDirFav: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
+        num: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -268,7 +268,7 @@ const updateDirFav = (request, response) => {
                     });
                 } else if (i === results.rows.length) {
                     pool.query('UPDATE dir_fav SET nombre_dir = $2 WHERE id_dir_fav = $1',
-                        [body.idDirFav, body.nombre], (error, results) => {
+                        [body.num, body.nombre], (error, results) => {
                             if (error) {
                                 return response.status(400).json({
                                     ok: false,
@@ -351,7 +351,7 @@ const deleteDirFav = (request, response) => {
 
     const body = request.body;
     const schema = {
-        idDirFav: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
+        num: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -361,7 +361,7 @@ const deleteDirFav = (request, response) => {
     }
 
     pool.query('DELETE FROM dir_fav WHERE id_dir_fav = $1',
-        [body.idDirFav], (error, results) => {
+        [body.num], (error, results) => {
             if (error) {
                 return response.status(404).json({
                     ok: false,
@@ -695,7 +695,7 @@ const revisarEstadoTaxista = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT * FROM carreras_en_curso WHERE id_taxista = $1', [params.id_taxista], (error, results) => {
+    pool.query('SELECT estado FROM taxistas_en_servicio WHERE id_taxista = $1', [params.id_taxista], (error, results) => {
         if (error) {
             return response.status(404).json({
                 ok: false,
@@ -703,15 +703,22 @@ const revisarEstadoTaxista = (request, response) => {
             });
         }
 
-        if (results.rows[0]){
-            return response.status(200).json({
-                ok: true,
-                estado: `carrera`
-            })
-        } else {
+        if (!results.rows[0]){
             return response.status(200).json({
                 ok: false,
                 estado: `ninguno`
+            })
+        }
+        if (results.rows[0].estado){
+            return response.status(200).json({
+                ok: false,
+                estado: `buscando`
+            })
+        }
+        else {
+            return response.status(200).json({
+                ok: true,
+                estado: `carrera`
             })
         }
 
