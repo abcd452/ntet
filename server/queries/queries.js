@@ -614,34 +614,68 @@ const revisarEstadoTaxista = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('SELECT estado FROM taxistas_en_servicio WHERE id_taxista = $1', [params.id_taxista], (error, results) => {
-        if (error) {
-            return response.status(404).json({
-                ok: false,
-                err: error
-            });
-        }
+    pool.query('SELECT * FROM taxistas_en_servicio WHERE id_taxista = $1',
+        [params.id_taxista], (error, results) => {
+            if (error) {
+                return response.status(404).json({
+                    ok: false,
+                    err: error
+                });
+            }
 
-        if (!results.rows[0]){
-            return response.status(200).json({
-                ok: false,
-                estado: `ninguno`
-            })
-        }
-        if (results.rows[0].estado){
-            return response.status(200).json({
-                ok: false,
-                estado: `buscando`
-            })
-        }
-        else {
-            return response.status(200).json({
-                ok: true,
-                estado: `carrera`
-            })
-        }
+            if (!results.rows[0]) {
+                return response.status(200).json({
+                    ok: false,
+                    estado: `ninguno`
+                })
+            }
 
-    });
+            if (results.rows[0].estado) {
+                return response.status(200).json({
+                    ok: false,
+                    estado: `buscando`
+                })
+            } else {
+                pool.query('SELECT * FROM carreras_en_curso WHERE id_taxista = $1',
+                    [params.id_taxista], (error, results) => {
+                        if (error) {
+                            return response.status(404).json({
+                                ok: false,
+                                err: error
+                            });
+                        }
+
+                        let num = results.rows[0].num_cel_u;
+                        let coordsI = '(' + results.rows[0].coords_inicial.x + ',' + results.rows[0].coords_inicial.y + ')';
+                        let coordsF = '(' + results.rows[0].coords_final.x + ',' + results.rows[0].coords_final.y + ')';//
+
+                        pool.query('SELECT * FROM taxista_a_usuario($1)',
+                            [num], (error, results) => {
+                                if (error) {
+                                    return response.status(404).json({
+                                        ok: false,
+                                        err: error
+                                    });
+                                }
+
+                                let vistaDeUsuario = {
+                                    nombreCompleto: results.rows[0].nombre_completo,
+                                    numeroCelUsuario: results.rows[0].numero_de_celular,
+                                    numeroDeViajes: results.rows[0].numero_de_viajes,
+                                    ubicacion: coordsI,
+                                    destino: coordsF
+                                };
+
+                                return response.status(200).json({
+                                    ok: true,
+                                    estado: `carrera`,
+                                    vistaDeUsuario
+                                })
+                            })
+                    })
+            }
+
+        });
 };
 
 const pedirCarrera = (request, response) => {
@@ -694,7 +728,7 @@ const pedirCarrera = (request, response) => {
                     });
                 }
 
-                response.status(201).json({
+                response.status(200).json({
                     ok: true,
                     message: `Busqueda con exito, esperando confirmacion del taxista`,
                     busqueda: {
@@ -732,8 +766,8 @@ const pedirCarrera = (request, response) => {
     })
 };
 
-const comenzarCarrera = (request, response) => {
-    console.log('comenzarCarrera');
+const buscarServicio = (request, response) => {
+    console.log('buscarServicio');
     const body = request.body;
 
     const schema = {
@@ -762,18 +796,6 @@ const comenzarCarrera = (request, response) => {
         return false;
     }
 
-    function borrar(x) {
-        for (let i = 0; i < carrerasPorTomar.length; i++) {
-            if (x === carrerasPorTomar[i][0]) { //borra todos los taxistas que no alcanzaron a aceptar del usuario carrerasPorTomar
-                i -= 1;
-                carrerasPorTomar.splice(i, 1);
-            } else if (x === body.id_taxista) { //borra todas las apariciones del taxista que acepto la carrera de carrerasPorTomar
-                i -= 1;
-                carrerasPorTomar.splice(i, 1);
-            }
-        }
-    }
-
     if (existe(body.id_taxista)) {
         pool.query('SELECT * FROM taxista_a_usuario($1)',
             [usuario_busqueda], (error, results) => {
@@ -795,12 +817,85 @@ const comenzarCarrera = (request, response) => {
                 response.status(200).json({
                     ok: true,
                     message: `Carrera encontrada!`,
+                    numUsuario: usuario_busqueda,
                     vistaDeUsuario
                 });
 
-                borrar(usuario_busqueda);
-                usuariosAceptados.push([usuario_busqueda, body.id_taxista, placaTaxista, coordsI, coordsF]);
+                usuariosPorAceptar.push([usuario_busqueda, body.id_taxista, placaTaxista, coordsI, coordsF]);
             });
+
+    } else {
+        response.status(404).json({
+            ok: false,
+            message: 'Su servicio no ha sido solicitado'
+        });
+    }
+};
+
+const confirmarServicio = (request, response) => {
+    console.log('buscarServicio');
+    const body = request.body;
+
+    const schema = {
+        id_taxista: Joi.string().max(20).required().regex(/^[0-9]+$/)
+    };
+
+    const {error} = Joi.validate(request.body, schema);
+
+    if (error) {
+        return response.status(400).send(error.details[0].message);
+    }
+
+    let usuario_busqueda;
+
+    function existe(x) {
+        for (let i = 0; i < carrerasPorTomar.length; i++) {
+            if (x === carrerasPorTomar[i][1]) {
+                usuario_busqueda = carrerasPorTomar[i][0];
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function borrar(x) {
+        for (let i = 0; i < carrerasPorTomar.length; i++) {
+            if (x === carrerasPorTomar[i][0]) { //borra todos los taxistas que no alcanzaron a aceptar del usuario carrerasPorTomar
+                i -= 1;
+                carrerasPorTomar.splice(i, 1);
+            } else if (x === body.id_taxista) { //borra todas las apariciones del taxista que acepto la carrera de carrerasPorTomar
+                i -= 1;
+                carrerasPorTomar.splice(i, 1);
+            }
+        }
+    }
+
+    function borrarPorAceptar(x) {
+        for (let i = 0; i < usuariosPorAceptar.length; i++) {
+            if (x === usuariosPorAceptar[i][0]) { //borra todos los taxistas que no alcanzaron a aceptar del usuario carrerasPorTomar
+                i -= 1;
+                usuariosPorAceptar.splice(i, 1);
+            } else if (x === body.id_taxista) { //borra todas las apariciones del taxista que acepto la carrera de carrerasPorTomar
+                i -= 1;
+                usuariosPorAceptar.splice(i, 1);
+            }
+        }
+    }
+
+    if (existe(body.id_taxista)) {
+
+        for (let i = 0; i < usuariosPorAceptar.length; i++){
+            if (usuariosPorAceptar[i][0] === usuario_busqueda){
+                usuariosAceptados.push([usuario_busqueda, body.id_taxista, usuariosPorAceptar[i][2], usuariosPorAceptar[i][3], usuariosPorAceptar[i][4]]);
+                borrar(usuario_busqueda);
+                borrarPorAceptar(usuario_busqueda)
+            }
+        }
+
+        return response.status(200).json({
+            ok: true,
+            message: `Carrera confirmada`
+        });
 
     } else {
         response.status(404).json({
@@ -1269,7 +1364,8 @@ module.exports = {
     getDirections, //Retorna las direcciones favoritas del usuario (roll usuario)
     pedirCarrera, //Permite al usuario pedir un taxi (roll usuario)
     createDirFav, //Permite al usuarip guardar una direccion especifica (roll usuario)
-    comenzarCarrera, //Permite al taxista saber si ha sido solicitado, en caso de serlo puede aceptar la carrera (roll taxista)
+    buscarServicio, //Permite al taxista saber si ha sido solicitado, en caso de serlo puede aceptar la carrera (roll taxista)
+    confirmarServicio,
     confirmarCarrera, //Notifica al usuario que su carrera ha sido aceptada (roll usuario)
     loginTaxista, //Logea al taxista a la aplicacion (roll taxista)
     getDriverById, //Da la info de un taxista especifico (roll taxista)

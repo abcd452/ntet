@@ -17,6 +17,7 @@ app.post('/profile/calificarTaxista', db.calificarTaxista);
 
 app.put('/profile/updateUser', db.updateUser); //Falta lo del token
 app.put('/profile/updateDirFav', db.updateDirFav); //Falta lo del token
+app.put('/taxista/cobrar',db.pagarSaldoCompleto);
 
 app.delete('/profile/deleteUser', db.deleteUser); //Falta lo del token
 app.delete('/profile/deleteDirFav', db.deleteDirFav); //Falta lo del token :VVVV
