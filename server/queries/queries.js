@@ -786,7 +786,12 @@ const buscarServicio = (request, response) => {
     }
 
     let usuario_busqueda; //usuario al que el taxista le acepto la carrera
-    let placaTaxista, coordsI, coordsF;
+    let placaTaxista;
+    let coordsILongitud;
+    let coordsILatitud ;
+    let coordsFLongitud;
+    let coordsFLatitud ;
+    let coordsI, coordsF;
 
     function existe(x) {
         for (let i = 0; i < carrerasPorTomar.length; i++) {
@@ -795,6 +800,10 @@ const buscarServicio = (request, response) => {
                 placaTaxista = carrerasPorTomar[i][2];
                 coordsI = carrerasPorTomar[i][3];
                 coordsF = carrerasPorTomar[i][4];
+                coordsILongitud = carrerasPorTomar[i][3].split(',')[0].replace(/[(]/g, '');
+                coordsILatitud = carrerasPorTomar[i][3].split(',')[1].replace(/[)]/g, '');
+                coordsFLongitud = carrerasPorTomar[i][4].split(',')[0].replace(/[(]/g, '');
+                coordsFLatitud = carrerasPorTomar[i][4].split(',')[1].replace(/[)]/g, '');
                 return true;
             }
         }
@@ -815,8 +824,10 @@ const buscarServicio = (request, response) => {
                     nombreCompleto: results.rows[0].nombre_completo,
                     numeroCelUsuario: results.rows[0].numero_de_celular,
                     numeroDeViajes: results.rows[0].numero_de_viajes,
-                    ubicacion: coordsI,
-                    destino: coordsF
+                    ubicacionLat: coordsILatitud,
+                    ubicacionLong: coordsILongitud,
+                    destinoLat: coordsFLatitud,
+                    destinoLong: coordsFLongitud
                 };
 
                 response.status(200).json({
