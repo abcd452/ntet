@@ -1132,7 +1132,7 @@ const calificarTaxista = (request, response) => {
 
                     return response.status(200).json({
                         ok: true,
-                        message: 'Ha califica al taxista',
+                        message: 'Ha calificado al taxista',
                         puntaje: body.puntaje,
                         taxista: taxista
                     });
