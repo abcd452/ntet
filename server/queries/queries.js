@@ -646,8 +646,8 @@ const revisarEstadoTaxista = (request, response) => {
                         }
 
                         let num = results.rows[0].num_cel_u;
-                        let coordsI = '(' + results.rows[0].coords_inicial.x + ',' + results.rows[0].coords_inicial.y + ')';
-                        let coordsF = '(' + results.rows[0].coords_final.x + ',' + results.rows[0].coords_final.y + ')';//
+                        let coordsI = results.rows[0].coords_inicial;
+                        let coordsF = results.rows[0].coords_final;
 
                         pool.query('SELECT * FROM taxista_a_usuario($1)',
                             [num], (error, results) => {
