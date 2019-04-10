@@ -646,8 +646,10 @@ const revisarEstadoTaxista = (request, response) => {
                         }
 
                         let num = results.rows[0].num_cel_u;
-                        let coordsI = results.rows[0].coords_inicial;
-                        let coordsF = results.rows[0].coords_final;
+                        let coordsILongitud = results.rows[0].coords_inicial.x;
+                        let coordsILatitud = results.rows[0].coords_inicial.y;
+                        let coordsFLongitud = results.rows[0].coords_final.x;
+                        let coordsFLatitud = results.rows[0].coords_final.y;
 
                         pool.query('SELECT * FROM taxista_a_usuario($1)',
                             [num], (error, results) => {
@@ -662,10 +664,13 @@ const revisarEstadoTaxista = (request, response) => {
                                     nombreCompleto: results.rows[0].nombre_completo,
                                     numeroCelUsuario: results.rows[0].numero_de_celular,
                                     numeroDeViajes: results.rows[0].numero_de_viajes,
-                                    ubicacion: coordsI,
-                                    destino: coordsF
+                                    ubicacionLat: coordsILatitud,
+                                    ubicacionLong: coordsILongitud,
+                                    destinoLat: coordsFLatitud,
+                                    destinoLong: coordsFLongitud
                                 };
 
+                                console.log(vistaDeUsuario);
                                 return response.status(200).json({
                                     ok: true,
                                     estado: `carrera`,
