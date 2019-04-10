@@ -1225,7 +1225,7 @@ const comenzarServicio = (request, response) => {
 
             response.status(201).json({
                 ok: true,
-                message: `Taxi registrado con exito`,
+                message: `Ha comenzado a prestar servicio, aparecera en las busquedas`,
                 usuario: {
                     placa: body.placa,
                     nombre: results.rows[0].nombre,
