@@ -268,7 +268,7 @@ const updateDirFav = (request, response) => {
                     });
                 } else if (i === results.rows.length) {
                     pool.query('UPDATE dir_fav SET nombre_dir = $2 WHERE num_cel_u = $1 AND nombre_dir = $2',
-                        [body.num, body.nombre], (error, results) => {
+                        [body.cel, body.nombre], (error, results) => {
                             if (error) {
                                 return response.status(400).json({
                                     ok: false,
