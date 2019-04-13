@@ -63,7 +63,7 @@ const createDirFav = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    function insertarDirFav(){
+    function insertarDirFav() {
         pool.query('INSERT INTO dir_fav (num_cel_u, nombre_dir, coords_gps_u) VALUES ($1, $2, $3)',
             [body.cel, body.nombre, body.coords], (error, results) => {
                 if (error) {
@@ -94,7 +94,7 @@ const createDirFav = (request, response) => {
                 });
             }
 
-            if (!results.rows[0]){
+            if (!results.rows[0]) {
                 return insertarDirFav();
             }
 
@@ -104,7 +104,7 @@ const createDirFav = (request, response) => {
                 numerosCoords[1].split('.')[0] + '.' + numerosCoords[1].split('.')[1].substring(0, 3) + cascaron[1];
 
             for (let i = 0; i < results.rows.length; i++) {
-                let resu = '(' + results.rows[i].coords_gps_u.x.toString().split('.')[0] + '.' + results.rows[i].coords_gps_u.x.toString().split('.')[1].substring(0, 3) +',' +
+                let resu = '(' + results.rows[i].coords_gps_u.x.toString().split('.')[0] + '.' + results.rows[i].coords_gps_u.x.toString().split('.')[1].substring(0, 3) + ',' +
                     results.rows[i].coords_gps_u.y.toString().split('.')[0] + '.' + results.rows[i].coords_gps_u.y.toString().split('.')[1].substring(0, 3) + ')';
 
                 if (results.rows[i].nombre_dir === body.nombre) {
@@ -115,7 +115,7 @@ const createDirFav = (request, response) => {
                 } else if (resu === resuBody) {
                     return response.status(400).json({
                         ok: false,
-                        message: 'Ya tiene otra direccion guardada en la misma coordenada'
+                        message: 'Ya tiene otra direccion guardada en el mismo lugar'
                     });
                 } else if (i === results.rows.length - 1) {
                     insertarDirFav();
@@ -242,8 +242,7 @@ const updateDirFav = (request, response) => {
     const body = request.body;
     const schema = {
         cel: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
-        nombre: Joi.string().min(1).max(250).required(),
-        num: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
+        nombre: Joi.string().min(1).max(250).required()
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -268,7 +267,7 @@ const updateDirFav = (request, response) => {
                         message: 'El nombre por el que intenta cambiar ya existe'
                     });
                 } else if (i === results.rows.length) {
-                    pool.query('UPDATE dir_fav SET nombre_dir = $2 WHERE id_dir_fav = $1',
+                    pool.query('UPDATE dir_fav SET nombre_dir = $2 WHERE num_cel_u = $1 AND nombre_dir = $2',
                         [body.num, body.nombre], (error, results) => {
                             if (error) {
                                 return response.status(400).json({
@@ -279,10 +278,9 @@ const updateDirFav = (request, response) => {
 
                             response.status(200).json({
                                 ok: true,
-                                message: `Actualizado con exito`,
+                                message: `Direccion actualizada con exito`,
                                 usuario: {
                                     nombre: body.nombre,
-                                    apellido: body.apellido,
                                     usuario: body.cel
                                 }
                             });
@@ -540,8 +538,8 @@ const revisarEstadoUsuario = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    for (let i = 0; i < usuariosPorCalificar.length; i++){
-        if (params.num === usuariosPorCalificar[i][0]){
+    for (let i = 0; i < usuariosPorCalificar.length; i++) {
+        if (params.num === usuariosPorCalificar[i][0]) {
             return response.status(200).json({
                 ok: true,
                 estado: `calificando`
@@ -549,8 +547,8 @@ const revisarEstadoUsuario = (request, response) => {
         }
     }
 
-    for (let i = 0; i < carrerasPorTomar.length; i++){
-        if (params.num === carrerasPorTomar[i][0]){
+    for (let i = 0; i < carrerasPorTomar.length; i++) {
+        if (params.num === carrerasPorTomar[i][0]) {
             return response.status(200).json({
                 ok: true,
                 estado: `solicitando`
@@ -566,7 +564,7 @@ const revisarEstadoUsuario = (request, response) => {
             });
         }
 
-        if (results.rows[0]){
+        if (results.rows[0]) {
             pool.query('SELECT * FROM usuario_a_taxista($1, $2)',
                 [results.rows[0].id_taxista, results.rows[0].placa], (error, results) => {
                     if (error) {
@@ -788,9 +786,9 @@ const buscarServicio = (request, response) => {
     let usuario_busqueda; //usuario al que el taxista le acepto la carrera
     let placaTaxista;
     let coordsILongitud;
-    let coordsILatitud ;
+    let coordsILatitud;
     let coordsFLongitud;
-    let coordsFLatitud ;
+    let coordsFLatitud;
     let coordsI, coordsF;
 
     function existe(x) {
@@ -838,6 +836,7 @@ const buscarServicio = (request, response) => {
                 });
 
                 usuariosPorAceptar.push([usuario_busqueda, body.id_taxista, placaTaxista, coordsI, coordsF]);
+                console.log(usuariosPorAceptar);
             });
 
     } else {
@@ -900,9 +899,10 @@ const confirmarServicio = (request, response) => {
 
     if (existe(body.id_taxista)) {
 
-        for (let i = 0; i < usuariosPorAceptar.length; i++){
-            if (usuariosPorAceptar[i][0] === usuario_busqueda){
+        for (let i = 0; i < usuariosPorAceptar.length; i++) {
+            if (usuariosPorAceptar[i][0] === usuario_busqueda) {
                 usuariosAceptados.push([usuario_busqueda, body.id_taxista, usuariosPorAceptar[i][2], usuariosPorAceptar[i][3], usuariosPorAceptar[i][4]]);
+                console.log(usuariosAceptados);
                 borrar(usuario_busqueda);
                 borrarPorAceptar(usuario_busqueda)
             }
@@ -969,7 +969,6 @@ const confirmarCarrera = (request, response) => {
                     });
                 }
 
-                //select * from usuario_a_taxista('1234', 'AAA111');
                 pool.query('SELECT * FROM usuario_a_taxista($1, $2)',
                     [taxista, placa], (error, results) => {
                         if (error) {
@@ -1019,6 +1018,8 @@ const terminarCarrera = (request, response) => {
     if (error) {
         return response.status(400).send(error.details[0].message);
     }
+
+    console.log(body.coordsF);
 
     pool.query('SELECT num_cel_u, placa FROM  carreras_en_curso WHERE id_taxista = $1',
         [body.id_taxista], (error, results) => {
@@ -1109,7 +1110,7 @@ const calificarTaxista = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    if (usuariosPorCalificar.length === 0){
+    if (usuariosPorCalificar.length === 0) {
         return response.status(404).json({
             ok: true,
             message: 'No tiene carreras pendientes por calificar'
@@ -1138,8 +1139,7 @@ const calificarTaxista = (request, response) => {
                     });
 
                 });
-        }
-        else if (i === usuariosPorCalificar.length - 1){
+        } else if (i === usuariosPorCalificar.length - 1) {
             response.status(404).json({
                 ok: true,
                 message: 'No tiene carreras pendientes por calificar'
@@ -1215,7 +1215,7 @@ const comenzarServicio = (request, response) => {
                 });
             }
 
-            if (!results.rows[0]){
+            if (!results.rows[0]) {
                 return response.status(400).json({
                     ok: false,
                     err: error,
@@ -1289,7 +1289,7 @@ const pagarSaldoCompleto = (request, response) => {
                 });
             }
 
-            if (!(results.rows[0])){
+            if (!(results.rows[0])) {
                 return response.status(404).json({
                     ok: false,
                     err: error,
@@ -1341,7 +1341,7 @@ const cobrarDeudaCompleta = (request, response) => {
                 });
             }
 
-            if (!results.rows[0]){
+            if (!results.rows[0]) {
                 return response.status(404).json({
                     ok: false,
                     err: error,
