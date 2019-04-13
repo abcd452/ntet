@@ -350,7 +350,8 @@ const deleteDirFav = (request, response) => {
 
     const body = request.body;
     const schema = {
-        num: Joi.string().min(1).max(25).required().regex(/^[0-9]+$/)
+        num: Joi.string().min(10).max(13).required().regex(/^[0-9]+$/),
+        nombre: Joi.string().min(1).max(250).required()
     };
 
     const {error} = Joi.validate(request.body, schema);
@@ -359,8 +360,8 @@ const deleteDirFav = (request, response) => {
         return response.status(400).send(error.details[0].message);
     }
 
-    pool.query('DELETE FROM dir_fav WHERE id_dir_fav = $1',
-        [body.num], (error, results) => {
+    pool.query('DELETE FROM dir_fav WHERE num_cel_u = $1 AND nombre_dir',
+        [body.num, body.nombre], (error, results) => {
             if (error) {
                 return response.status(404).json({
                     ok: false,
