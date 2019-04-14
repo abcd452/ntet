@@ -4,10 +4,17 @@ const jwt = require('jsonwebtoken');
 const Joi = require('joi');
 const connectionData = require('../config/config').connectionData;
 const pool = new Pool(connectionData);
-let carrerasPorTomar = new Array();
-let usuariosPorAceptar = new Array();
-let usuariosAceptados = new Array();
-let usuariosPorCalificar = new Array();
+let carrerasPorTomar = new Array(); //Guarda los taxistas que fueron encontrados para una determinada carrera con la siguiente info
+                                    // [numero de celular del usuario, id del taxista encontrado, placa del taxi, coordenadas donde recogera al usuario,
+                                    // coordenadas donde terminara la carrera, la distancia a la que se encuntran] las coordenadas se ven asi '(longitud,latitud)'
+
+let usuariosPorAceptar = new Array();//Guarda los usuarios que faltan por aceptar una carrera que un taxista a confirmado que va a tomar
+
+let usuariosPorCalificar = new Array();//Guarda a los usuarios que tienen una carrrera pendiente por calificar
+
+//Tener en cuenta
+//El schema son los campos que se necesitan con sus determinadas restricciones
+//Las descripciones de lo que hace cada funcion estan en la parte de mas abajo
 
 // ALL QUERIES, HERE: 
 
@@ -886,26 +893,11 @@ const confirmarServicio = (request, response) => {
         }
     }
 
-    function borrarPorAceptar(x) {
-        for (let i = 0; i < usuariosPorAceptar.length; i++) {
-            if (x === usuariosPorAceptar[i][0]) { //borra todos los taxistas que no alcanzaron a aceptar del usuario carrerasPorTomar
-                i -= 1;
-                usuariosPorAceptar.splice(i, 1);
-            } else if (x === body.id_taxista) { //borra todas las apariciones del taxista que acepto la carrera de carrerasPorTomar
-                i -= 1;
-                usuariosPorAceptar.splice(i, 1);
-            }
-        }
-    }
-
     if (existe(body.id_taxista)) {
 
         for (let i = 0; i < usuariosPorAceptar.length; i++) {
             if (usuariosPorAceptar[i][0] === usuario_busqueda) {
-                usuariosAceptados.push([usuario_busqueda, body.id_taxista, usuariosPorAceptar[i][2], usuariosPorAceptar[i][3], usuariosPorAceptar[i][4]]);
-                console.log(usuariosAceptados);
                 borrar(usuario_busqueda);
-                borrarPorAceptar(usuario_busqueda)
             }
         }
 
@@ -922,8 +914,8 @@ const confirmarServicio = (request, response) => {
     }
 };
 
-const confirmarCarrera = (request, response) => {
-    console.log('confirmarCarrera');
+const notificarCarreraAceptada = (request, response) => {
+    console.log('notificarCarreraAceptada');
 
     const body = request.body;
     const schema = {
@@ -939,14 +931,14 @@ const confirmarCarrera = (request, response) => {
     let taxista, placa, coordsI, coordsF;
 
     function existe(x) {
-        for (let i = 0; i < usuariosAceptados.length; i++) {
-            if (x === usuariosAceptados[i][0]) {
-                taxista = usuariosAceptados[i][1];
-                placa = usuariosAceptados[i][2];
-                coordsI = usuariosAceptados[i][3];
-                coordsF = usuariosAceptados[i][4];
+        for (let i = 0; i < usuariosPorAceptar.length; i++) {
+            if (x === usuariosPorAceptar[i][0]) {
+                taxista = usuariosPorAceptar[i][1];
+                placa = usuariosPorAceptar[i][2];
+                coordsI = usuariosPorAceptar[i][3];
+                coordsF = usuariosPorAceptar[i][4];
 
-                usuariosAceptados.splice(i, 1);
+                usuariosPorAceptar.splice(i, 1);
                 return true;
             }
         }
@@ -1375,28 +1367,28 @@ module.exports = {
     createUser, //Crea una cuenta de usuario (roll usuario)
     createTaxista, //Crea una cuenta de taxista (roll taxista)
     getUserById, //Da la info de un usuario especifico (roll usuario)
-    deleteUser,
+    deleteUser, //borra al usuario de la base de datos
     updateUser, //Actualiza la info de un usuario en particular (roll usuario)
     loginUser, //Logea al usuario a la aplicacion (roll usuario)
     getDirections, //Retorna las direcciones favoritas del usuario (roll usuario)
     pedirCarrera, //Permite al usuario pedir un taxi (roll usuario)
     createDirFav, //Permite al usuarip guardar una direccion especifica (roll usuario)
     buscarServicio, //Permite al taxista saber si ha sido solicitado, en caso de serlo puede aceptar la carrera (roll taxista)
-    confirmarServicio,
-    confirmarCarrera, //Notifica al usuario que su carrera ha sido aceptada (roll usuario)
+    confirmarServicio, //Permite al taxista aceptar una carrera si es que lo desea
+    notificarCarreraAceptada, //Notifica al usuario que su carrera ha sido aceptada (roll usuario)
     loginTaxista, //Logea al taxista a la aplicacion (roll taxista)
     getDriverById, //Da la info de un taxista especifico (roll taxista)
     terminarCarrera, //Permite al taxista terminar una carrera (roll taxista)
     notificarCarreraTerminada, //Notifica al usuario que la carrera ha terminado (roll usuario)
     calificarTaxista, //Permite al usuario calificar la carrera que acabo de tener (roll usuario)
     registrarTaxi, //Permite al taxista registrar un taxi
-    comenzarServicio,
-    updateDirFav,
-    deleteDirFav,
-    revisarEstadoUsuario,
-    terminarServicio,
-    revisarEstadoTaxista,
-    updateTaxista,
-    pagarSaldoCompleto,
-    cobrarDeudaCompleta
+    comenzarServicio, //Permite al taxista ponerse en estado disponible para ser encontrado en las busquedas de carrera
+    updateDirFav, //Permite al usuario actualizar el nombre de una direccion favorita
+    deleteDirFav, //Permite al usuario borrar una direccion favorita
+    revisarEstadoUsuario, //Permite a la aplicacion saber en que estado se encuentra el usuario (pidiendo carrera, en plena carrera, etc)
+    terminarServicio, //Permite al taxista dejar de prestar servicio para no aparecer en las busquedas de carrera
+    revisarEstadoTaxista, //Permite a la aplicacion saber en que estado se encuentra el taxista (En carrera, en busqueda, sin comenzar servicio)
+    updateTaxista, //Permite al taxista actualizar su nombre y/o apellido
+    pagarSaldoCompleto, //Permite a la aplicacion pagar el saldo que le debe al taxista
+    cobrarDeudaCompleta //Permite al usuario pagar la deuda que ha acomulado de todas sus carreras
 };
